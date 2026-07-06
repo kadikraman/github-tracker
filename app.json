@@ -12,27 +12,8 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "dev.kadi.github-tracker"
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false,
-      "package": "dev.kadi.github_tracker"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "platforms": [
-      "android",
-      "ios",
-      "macos",
-      "windows"
+      "macos"
     ],
     "macos": {
       "bundleIdentifier": "dev.kadi.github-tracker"
