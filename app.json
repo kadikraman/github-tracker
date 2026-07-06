@@ -13,7 +13,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.kadi.github-tracker"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +22,29 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "dev.kadi.github_tracker"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "platforms": [
+      "android",
+      "ios",
+      "macos",
+      "windows"
+    ],
+    "macos": {
+      "bundleIdentifier": "dev.kadi.github-tracker"
+    },
+    "plugins": [
+      [
+        "expo-desktop-config-plugins",
+        {
+          "displayName": "GitHub Tracker",
+          "bundleIdentifier": "dev.kadi.github-tracker"
+        }
+      ]
+    ]
   }
 }
