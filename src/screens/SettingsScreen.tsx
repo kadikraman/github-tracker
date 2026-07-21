@@ -8,10 +8,12 @@ import {
   View,
 } from 'react-native';
 import { fetchViewer } from '../api/github';
+import { useTheme } from '../hooks/useTheme';
 import { useToken } from '../hooks/useToken';
-import { colors, fonts } from '../theme';
+import { appBadgeColor } from '../theme';
 
 export function SettingsScreen({ onDone }: { onDone?: () => void }) {
+  const { colors } = useTheme();
   const { token, setToken } = useToken();
   const [input, setInput] = useState('');
   const [saving, setSaving] = useState(false);
@@ -43,56 +45,80 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.toolbar}>
-        <Text style={styles.toolbarTitle}>Settings</Text>
+    <View style={[styles.container, { backgroundColor: colors.appBg }]}>
+      <View
+        style={[styles.toolbar, { backgroundColor: colors.titlebar, borderBottomColor: colors.border }]}
+      >
+        <Text style={[styles.toolbarTitle, { color: colors.text }]}>Settings</Text>
         {token && onDone ? (
-          <Pressable onPress={onDone} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Done</Text>
+          <Pressable
+            onPress={onDone}
+            style={[styles.secondaryButton, { backgroundColor: colors.sunken }]}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Done</Text>
           </Pressable>
         ) : null}
       </View>
       <View style={styles.content}>
-        <Text style={styles.label}>GitHub Personal Access Token</Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder={token ? 'Token saved — paste to replace' : 'ghp_…'}
-            placeholderTextColor={colors.neutral500}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.input}
-            onSubmitEditing={save}
-          />
-          <Pressable onPress={save} disabled={saving} style={styles.saveButton}>
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.bg} />
-            ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
-            )}
-          </Pressable>
-        </View>
-        <Text style={styles.counterText}>{input.length} characters entered</Text>
-        {status ? (
-          <Text style={status.kind === 'error' ? styles.errorText : styles.successText}>
-            {status.message}
+        <View style={[styles.card, { backgroundColor: colors.card }, colors.shadow]}>
+          <Text style={[styles.label, { color: colors.muted }]}>GitHub Personal Access Token</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              placeholder={token ? 'Token saved — paste to replace' : 'ghp_…'}
+              placeholderTextColor={colors.faint}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={[
+                styles.input,
+                { backgroundColor: colors.sunken, borderColor: colors.border, color: colors.text },
+              ]}
+              onSubmitEditing={save}
+            />
+            <Pressable
+              onPress={save}
+              disabled={saving}
+              style={[styles.saveButton, { backgroundColor: appBadgeColor }]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save</Text>
+              )}
+            </Pressable>
+          </View>
+          <Text style={[styles.counterText, { color: colors.faint }]}>
+            {input.length} characters entered
           </Text>
-        ) : null}
-        <Text style={styles.helpText}>
-          Create a token at github.com → Settings → Developer settings. It needs the{' '}
-          <Text style={styles.code}>repo</Text> scope. For PRs in SSO-protected orgs (like{' '}
-          <Text style={styles.code}>expo</Text>), open the token's “Configure SSO” menu and
-          authorize it for the org — otherwise those PRs silently won't appear.
-        </Text>
-        <Text style={styles.helpText}>
-          The token is stored as a plain file in this app's sandboxed container on your Mac.
-        </Text>
-        {token ? (
-          <Pressable onPress={() => setToken(null)} style={styles.clearButton}>
-            <Text style={styles.clearButtonText}>Clear token</Text>
-          </Pressable>
-        ) : null}
+          {status ? (
+            <Text
+              style={[
+                styles.statusText,
+                { color: status.kind === 'error' ? colors.danger : colors.success },
+              ]}
+            >
+              {status.message}
+            </Text>
+          ) : null}
+          <Text style={[styles.helpText, { color: colors.muted }]}>
+            Create a token at github.com → Settings → Developer settings. It needs the{' '}
+            <Text style={styles.code}>repo</Text> scope. For PRs in SSO-protected orgs (like{' '}
+            <Text style={styles.code}>expo</Text>), open the token's “Configure SSO” menu and
+            authorize it for the org — otherwise those PRs silently won't appear.
+          </Text>
+          <Text style={[styles.helpText, { color: colors.muted }]}>
+            The token is stored as a plain file in this app's sandboxed container on your Mac.
+          </Text>
+          {token ? (
+            <Pressable
+              onPress={() => setToken(null)}
+              style={[styles.clearButton, { backgroundColor: colors.sunken }]}
+            >
+              <Text style={[styles.clearButtonText, { color: colors.danger }]}>Clear token</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -101,45 +127,41 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.bg,
   },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: colors.bgRaised,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.divider,
+    paddingVertical: 11,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
   },
   toolbarTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 15,
-    letterSpacing: -0.15,
-    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: -0.14,
   },
   secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.divider,
+    borderRadius: 8,
     paddingVertical: 5,
     paddingHorizontal: 12,
   },
   secondaryButtonText: {
-    fontFamily: fonts.semiBold,
     fontSize: 12,
-    color: colors.text,
+    fontWeight: '600',
   },
   content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
+    padding: 22,
+  },
+  card: {
+    borderRadius: 14,
+    padding: 16,
     gap: 10,
     maxWidth: 560,
   },
   label: {
-    fontFamily: fonts.semiBold,
     fontSize: 12,
-    color: colors.neutral700,
+    fontWeight: '600',
   },
   inputRow: {
     flexDirection: 'row',
@@ -150,63 +172,47 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 32,
     borderWidth: 1,
-    borderColor: colors.divider,
-    backgroundColor: colors.surface,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    fontFamily: fonts.body,
     fontSize: 13,
-    color: colors.text,
   },
   saveButton: {
-    backgroundColor: colors.accent,
+    borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 16,
     minWidth: 64,
     alignItems: 'center',
   },
   saveButtonText: {
-    fontFamily: fonts.heading,
     fontSize: 13,
-    color: colors.bg,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   counterText: {
-    fontFamily: fonts.body,
     fontSize: 11,
-    color: colors.neutral500,
   },
-  errorText: {
-    fontFamily: fonts.body,
+  statusText: {
     fontSize: 12,
-    color: colors.accent700,
-  },
-  successText: {
-    fontFamily: fonts.body,
-    fontSize: 12,
-    color: '#2e7d32',
+    fontWeight: '600',
   },
   helpText: {
-    fontFamily: fonts.body,
     fontSize: 12,
     lineHeight: 17,
-    color: colors.neutral600,
   },
   code: {
     fontFamily: 'Menlo',
     fontSize: 11,
-    color: colors.text,
   },
   clearButton: {
     alignSelf: 'flex-start',
     marginTop: 4,
-    borderWidth: 1,
-    borderColor: colors.divider,
+    borderRadius: 8,
     paddingVertical: 5,
     paddingHorizontal: 12,
   },
   clearButtonText: {
-    fontFamily: fonts.semiBold,
     fontSize: 12,
-    color: colors.accent700,
+    fontWeight: '600',
   },
 });

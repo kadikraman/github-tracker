@@ -1,47 +1,89 @@
-export const colors = {
-  bg: '#f3f2f2',
-  bgRaised: '#f5f4f4',
-  surface: '#eae9e9',
-  text: '#201e1d',
-  accent: '#ec3013',
-  divider: 'rgba(32, 30, 29, 0.4)',
-  dividerFaint: 'rgba(32, 30, 29, 0.18)',
-  hoverText4: 'rgba(32, 30, 29, 0.04)',
-  hoverText9: 'rgba(32, 30, 29, 0.09)',
-  activeText16: 'rgba(32, 30, 29, 0.16)',
-  neutral100: '#f8f4f4',
-  neutral200: '#eae7e7',
-  neutral300: '#d7d3d3',
-  neutral400: '#bab6b6',
-  neutral500: '#9b9797',
-  neutral600: '#7d7979',
-  neutral700: '#605d5d',
-  neutral800: '#444141',
-  neutral900: '#2d2b2b',
-  accent100: '#fff2ef',
-  accent600: '#dd2b0f',
-  accent700: '#ae1800',
-  accent800: '#7c1405',
-} as const;
+export type ThemeMode = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
 
-export const fonts = {
-  body: 'Archivo_400Regular',
-  semiBold: 'Archivo_600SemiBold',
-  heading: 'Archivo_800ExtraBold',
-} as const;
+export type Palette = {
+  appBg: string;
+  card: string;
+  cardHover: string;
+  sunken: string;
+  text: string;
+  muted: string;
+  faint: string;
+  border: string;
+  sep: string;
+  titlebar: string;
+  review: string;
+  mentioned: string;
+  prs: string;
+  issues: string;
+  danger: string;
+  success: string;
+  shadow: {
+    shadowColor: string;
+    shadowOpacity: number;
+    shadowRadius: number;
+    shadowOffset: { width: number; height: number };
+  };
+};
 
-export const avatarPalette = [
-  '#605d5d',
-  '#7d7979',
-  '#444141',
-  '#9b9797',
-  '#2d2b2b',
-] as const;
+export const lightPalette: Palette = {
+  appBg: '#f4f5f8',
+  card: '#ffffff',
+  cardHover: '#f6f7f9',
+  sunken: 'rgba(20, 22, 28, 0.06)',
+  text: '#1a1d23',
+  muted: '#656c77',
+  faint: '#979ea9',
+  border: 'rgba(20, 22, 28, 0.09)',
+  sep: 'rgba(20, 22, 28, 0.07)',
+  titlebar: '#fbfcfd',
+  review: '#7c5cff',
+  mentioned: '#e0850a',
+  prs: '#12a150',
+  issues: '#2f74e0',
+  danger: '#e5484d',
+  success: '#12a150',
+  shadow: {
+    shadowColor: '#14161c',
+    shadowOpacity: 0.09,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+};
 
-export function avatarColor(login: string): string {
-  let h = 0;
-  for (const c of login) {
-    h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  }
-  return avatarPalette[h % avatarPalette.length] as string;
+export const darkPalette: Palette = {
+  appBg: '#15171c',
+  card: '#1e222a',
+  cardHover: '#262b34',
+  sunken: 'rgba(255, 255, 255, 0.07)',
+  text: '#e8eaef',
+  muted: '#9aa1ad',
+  faint: '#6b7280',
+  border: 'rgba(255, 255, 255, 0.09)',
+  sep: 'rgba(255, 255, 255, 0.07)',
+  titlebar: '#1a1c23',
+  review: '#a68bff',
+  mentioned: '#f5b13d',
+  prs: '#3ad07e',
+  issues: '#6aa4ff',
+  danger: '#ff7076',
+  success: '#3ad07e',
+  shadow: {
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+  },
+};
+
+/** rgba() from a #rrggbb hex — runtime stand-in for CSS color-mix. */
+export function alpha(hex: string, opacity: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
+
+/** App badge — solid blend of the design's #8b6dff → #4d8bff gradient. */
+export const appBadgeColor = '#6c7cff';
+

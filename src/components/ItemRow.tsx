@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { TrackedItem } from '../api/types';
+import { useTheme } from '../hooks/useTheme';
 import { timeAgo } from '../lib/timeAgo';
-import { avatarColor, colors, fonts } from '../theme';
+import { alpha } from '../theme';
 import { EyeIcon, EyeOffIcon, IssueIcon, PullRequestIcon } from './icons';
 
 export function repoFullName(repositoryUrl: string): string {
@@ -10,66 +11,59 @@ export function repoFullName(repositoryUrl: string): string {
   return fullName ?? repositoryUrl;
 }
 
-function Avatar({ login }: { login: string }) {
-  return (
-    <View style={[styles.avatar, { backgroundColor: avatarColor(login) }]}>
-      <Text style={styles.avatarText}>{(login[0] ?? '?').toUpperCase()}</Text>
-    </View>
-  );
-}
-
 type ItemRowProps = {
   item: TrackedItem;
-  accent?: boolean;
+  accent: string;
+  isLast: boolean;
   onHide: () => void;
 };
 
-export function ItemRow({ item, accent, onHide }: ItemRowProps) {
+export function ItemRow({ item, accent, isLast, onHide }: ItemRowProps) {
+  const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
   const [hideHovered, setHideHovered] = useState(false);
   const isIssue = item.pull_request == null;
-  const iconColor = item.draft
-    ? colors.neutral400
-    : accent
-      ? colors.accent600
-      : colors.neutral500;
 
   return (
     <Pressable
       onPress={() => Linking.openURL(item.html_url)}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
-      style={[styles.row, hovered && styles.rowHovered]}
+      style={[
+        styles.row,
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.sep },
+        hovered && { backgroundColor: colors.cardHover },
+      ]}
     >
-      <Avatar login={item.user.login} />
       <View style={styles.typeIcon}>
         {isIssue ? (
-          <IssueIcon size={17} color={iconColor} />
+          <IssueIcon size={17} color={accent} />
         ) : (
-          <PullRequestIcon size={17} color={iconColor} />
+          <PullRequestIcon size={17} color={accent} />
         )}
       </View>
       <View style={styles.body}>
         <View style={styles.titleLine}>
-          <Text style={styles.title}>{item.title}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
           {item.draft ? (
-            <View style={styles.draftTag}>
-              <Text style={styles.draftTagText}>Draft</Text>
+            <View style={[styles.draftTag, { backgroundColor: colors.sunken }]}>
+              <Text style={[styles.draftTagText, { color: colors.muted }]}>DRAFT</Text>
             </View>
           ) : null}
         </View>
-        <Text style={styles.meta} numberOfLines={1}>
-          {repoFullName(item.repository_url)} <Text style={styles.metaNum}>#{item.number}</Text> ·{' '}
-          {item.user.login} · updated {timeAgo(item.updated_at)}
+        <Text style={[styles.meta, { color: colors.muted }]} numberOfLines={1}>
+          {repoFullName(item.repository_url)}{' '}
+          <Text style={{ color: colors.faint }}>#{item.number}</Text> · {item.user.login} ·
+          updated {timeAgo(item.updated_at)}
         </Text>
       </View>
       <Pressable
         onPress={onHide}
         onHoverIn={() => setHideHovered(true)}
         onHoverOut={() => setHideHovered(false)}
-        style={[styles.hideButton, hideHovered && styles.hideButtonHovered]}
+        style={[styles.hideButton, hideHovered && { backgroundColor: alpha(accent, 0.13) }]}
       >
-        <EyeOffIcon size={16} color={hideHovered ? colors.accent : colors.neutral500} />
+        <EyeOffIcon size={16} color={hideHovered ? accent : colors.faint} />
       </Pressable>
     </Pressable>
   );
@@ -77,16 +71,26 @@ export function ItemRow({ item, accent, onHide }: ItemRowProps) {
 
 type HiddenItemRowProps = {
   item: TrackedItem;
+  accent: string;
+  isLast: boolean;
   onUnhide: () => void;
 };
 
-export function HiddenItemRow({ item, onUnhide }: HiddenItemRowProps) {
+export function HiddenItemRow({ item, accent, isLast, onUnhide }: HiddenItemRowProps) {
+  const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
   return (
-    <View style={styles.hiddenRow}>
-      <View style={styles.body}>
-        <Text style={styles.hiddenTitle}>{item.title}</Text>
-        <Text style={styles.hiddenMeta} numberOfLines={1}>
+    <View
+      style={[
+        styles.hiddenRow,
+        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.sep },
+      ]}
+    >
+      <View style={[styles.body, styles.hiddenBody]}>
+        <Text style={[styles.hiddenTitle, { color: colors.text, textDecorationColor: colors.faint }]}>
+          {item.title}
+        </Text>
+        <Text style={[styles.hiddenMeta, { color: colors.muted }]} numberOfLines={1}>
           {repoFullName(item.repository_url)} #{item.number} · {item.user.login}
         </Text>
       </View>
@@ -94,10 +98,10 @@ export function HiddenItemRow({ item, onUnhide }: HiddenItemRowProps) {
         onPress={onUnhide}
         onHoverIn={() => setHovered(true)}
         onHoverOut={() => setHovered(false)}
-        style={[styles.unhideButton, hovered && styles.unhideButtonHovered]}
+        style={[styles.unhideButton, { backgroundColor: colors.card }, colors.shadow]}
       >
-        <EyeIcon size={14} color={hovered ? colors.accent : colors.text} />
-        <Text style={[styles.unhideText, hovered && styles.unhideTextHovered]}>Unhide</Text>
+        <EyeIcon size={14} color={hovered ? accent : colors.text} />
+        <Text style={[styles.unhideText, { color: hovered ? accent : colors.text }]}>Unhide</Text>
       </Pressable>
     </View>
   );
@@ -106,32 +110,13 @@ export function HiddenItemRow({ item, onUnhide }: HiddenItemRowProps) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 13,
-    paddingVertical: 13,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-  },
-  rowHovered: {
-    backgroundColor: colors.hoverText4,
-  },
-  avatar: {
-    flex: 0,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 1,
-  },
-  avatarText: {
-    fontFamily: fonts.heading,
-    fontSize: 11,
-    color: '#ffffff',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
   },
   typeIcon: {
-    marginTop: 4,
+    flex: 0,
   },
   body: {
     flex: 1,
@@ -144,65 +129,50 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   title: {
-    fontFamily: fonts.heading,
-    fontSize: 14.5,
-    lineHeight: 19,
-    color: colors.text,
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 18,
     flexShrink: 1,
   },
   draftTag: {
-    backgroundColor: colors.neutral100,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
   },
   draftTagText: {
-    fontFamily: fonts.body,
-    fontSize: 11,
-    letterSpacing: 0.22,
-    color: colors.neutral800,
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.42,
   },
   meta: {
-    fontFamily: fonts.body,
     fontSize: 12.5,
-    color: colors.neutral600,
     marginTop: 3,
-  },
-  metaNum: {
-    color: colors.neutral500,
   },
   hideButton: {
     flex: 0,
     width: 30,
     height: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    opacity: 0.55,
-  },
-  hideButtonHovered: {
-    opacity: 1,
-    backgroundColor: colors.accent100,
   },
   hiddenRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 13,
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.divider,
-    opacity: 0.7,
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+  },
+  hiddenBody: {
+    opacity: 0.72,
   },
   hiddenTitle: {
-    fontFamily: fonts.heading,
     fontSize: 13.5,
-    color: colors.text,
+    fontWeight: '600',
     textDecorationLine: 'line-through',
-    textDecorationColor: colors.neutral400,
   },
   hiddenMeta: {
-    fontFamily: fonts.body,
     fontSize: 12,
-    color: colors.neutral600,
     marginTop: 2,
   },
   unhideButton: {
@@ -210,20 +180,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderWidth: 1,
-    borderColor: colors.divider,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  unhideButtonHovered: {
-    borderColor: colors.accent,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
   },
   unhideText: {
-    fontFamily: fonts.body,
     fontSize: 12,
-    color: colors.text,
-  },
-  unhideTextHovered: {
-    color: colors.accent,
+    fontWeight: '600',
   },
 });

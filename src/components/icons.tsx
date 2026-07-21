@@ -1,4 +1,4 @@
-import { View, type ViewStyle } from 'react-native';
+import { Text, View, type ViewStyle } from 'react-native';
 
 type IconProps = {
   size?: number;
@@ -162,41 +162,114 @@ export function ChevronIcon({ size = 13, color }: IconProps) {
   );
 }
 
-/** Circular arrows approximation: ring with a gap and an arrowhead. */
+/** Clockwise circle arrow — text glyph, renders monochrome on macOS. The
+    glyph carries built-in padding, so it's drawn oversized to line up with
+    the other icons. */
 export function RefreshIcon({ size = 16, color }: IconProps) {
-  const stroke = Math.max(1.5, size * 0.12);
-  const head = size * 0.32;
+  const glyphSize = Math.round(size * 1.75);
+  return (
+    <View style={{ width: size + 4, height: size + 4, alignItems: 'center', justifyContent: 'center' }}>
+      <Text
+        style={{
+          fontSize: glyphSize,
+          lineHeight: glyphSize,
+          color,
+          fontWeight: '600',
+          textAlign: 'center',
+          transform: [{ translateY: -size * 0.16 }, { translateX: -size * 0.03 }],
+        }}
+      >
+        ⟳
+      </Text>
+    </View>
+  );
+}
+
+/** Sun: center disc with eight rays. */
+export function SunIcon({ size = 15, color }: IconProps) {
+  const disc = size * 0.36;
+  const rayLength = size * 0.24;
+  const rayWidth = Math.max(1.4, size * 0.1);
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View
+        style={{
+          width: disc,
+          height: disc,
+          borderRadius: disc / 2,
+          borderWidth: Math.max(1.4, size * 0.12),
+          borderColor: color,
+        }}
+      />
+      {Array.from({ length: 8 }, (_, i) => (
+        <View
+          key={i}
+          style={abs({
+            left: size / 2 - rayWidth / 2,
+            top: size / 2 - rayLength / 2,
+            width: rayWidth,
+            height: rayLength,
+            borderRadius: rayWidth / 2,
+            backgroundColor: color,
+            transform: [{ rotate: `${i * 45}deg` }, { translateY: -size * 0.4 }],
+          })}
+        />
+      ))}
+    </View>
+  );
+}
+
+/** Crescent moon — text glyph, renders monochrome on macOS. */
+export function MoonIcon({ size = 15, color }: IconProps) {
+  return (
+    <Text style={{ fontSize: size, lineHeight: size + 2, color, fontWeight: '600' }}>☾</Text>
+  );
+}
+
+/** Monitor with stand — the "follow system" theme option. */
+export function MonitorIcon({ size = 15, color }: IconProps) {
+  const s = size / 24;
+  const stroke = Math.max(1.4, 2 * s);
   return (
     <View style={{ width: size, height: size }}>
       <View
         style={abs({
-          left: size * 0.06,
-          top: size * 0.06,
-          width: size * 0.88,
-          height: size * 0.88,
-          borderRadius: size * 0.44,
+          left: 3 * s,
+          top: 4 * s,
+          width: 18 * s,
+          height: 12 * s,
+          borderRadius: 2 * s,
           borderWidth: stroke,
           borderColor: color,
-          borderTopColor: 'transparent',
-          transform: [{ rotate: '45deg' }],
         })}
       />
       <View
         style={abs({
-          left: size * 0.68,
-          top: -size * 0.02,
-          width: 0,
-          height: 0,
-          borderLeftWidth: head * 0.7,
-          borderRightWidth: head * 0.7,
-          borderBottomWidth: head,
-          borderLeftColor: 'transparent',
-          borderRightColor: 'transparent',
-          borderBottomColor: color,
-          transform: [{ rotate: '125deg' }],
+          left: 12 * s - stroke / 2,
+          top: 16 * s,
+          width: stroke,
+          height: 4 * s,
+          backgroundColor: color,
+        })}
+      />
+      <View
+        style={abs({
+          left: 8 * s,
+          top: 20 * s - stroke / 2,
+          width: 8 * s,
+          height: stroke,
+          borderRadius: stroke / 2,
+          backgroundColor: color,
         })}
       />
     </View>
+  );
+}
+
+/** At-sign for the Mentioned section — text glyph matches stroke icons well. */
+export function AtSignIcon({ size = 17, color }: IconProps) {
+  return (
+    <Text style={{ fontSize: size * 0.92, lineHeight: size + 1, color, fontWeight: '700' }}>@</Text>
   );
 }
 

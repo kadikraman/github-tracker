@@ -1,12 +1,7 @@
-import {
-  Archivo_400Regular,
-  Archivo_600SemiBold,
-  Archivo_800ExtraBold,
-} from '@expo-google-fonts/archivo';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useFonts } from 'expo-font';
 import { useEffect, useState } from 'react';
 import { HiddenProvider } from './src/hooks/useHidden';
+import { ThemeProvider } from './src/hooks/useTheme';
 import { TokenProvider, useToken } from './src/hooks/useToken';
 import { setupFocusManager } from './src/lib/focusManager';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -28,25 +23,17 @@ function Root() {
 }
 
 export default function App() {
-  const [fontsLoaded, fontError] = useFonts({
-    Archivo_400Regular,
-    Archivo_600SemiBold,
-    Archivo_800ExtraBold,
-  });
-
   useEffect(() => setupFocusManager(), []);
-
-  if (!fontsLoaded && !fontError) {
-    return null;
-  }
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TokenProvider>
-        <HiddenProvider>
-          <Root />
-        </HiddenProvider>
-      </TokenProvider>
+      <ThemeProvider>
+        <TokenProvider>
+          <HiddenProvider>
+            <Root />
+          </HiddenProvider>
+        </TokenProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

@@ -3,6 +3,7 @@ import { File, Paths } from 'expo-file-system';
 export type Settings = {
   token?: string;
   hidden?: Record<string, number[]>;
+  themeMode?: 'light' | 'dark' | 'system';
 };
 
 const settingsFile = new File(Paths.document, 'settings.json');
