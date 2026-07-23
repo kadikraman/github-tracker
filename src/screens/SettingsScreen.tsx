@@ -108,7 +108,7 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
             authorize it for the org — otherwise those PRs silently won't appear.
           </Text>
           <Text style={[styles.helpText, { color: colors.muted }]}>
-            The token is stored as a plain file in this app's sandboxed container on your Mac.
+            The token is stored securely in your macOS Keychain.
           </Text>
           {token ? (
             <Pressable

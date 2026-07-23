@@ -1,6 +1,8 @@
 import { File, Paths } from 'expo-file-system';
 
 export type Settings = {
+  /** Legacy: tokens now live in the Keychain (see tokenStore.ts); this field
+      only exists so old files can be migrated and scrubbed. */
   token?: string;
   hidden?: Record<string, number[]>;
   themeMode?: 'light' | 'dark' | 'system';

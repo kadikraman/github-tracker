@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { loadSettings, saveSettings } from '../storage/settings';
+import { loadToken, saveToken } from '../storage/tokenStore';
 
 type TokenContextValue = {
   token: string | null;
@@ -9,12 +9,11 @@ type TokenContextValue = {
 const TokenContext = createContext<TokenContextValue | undefined>(undefined);
 
 export function TokenProvider({ children }: { children: ReactNode }) {
-  const [token, setTokenState] = useState<string | null>(() => loadSettings().token ?? null);
+  const [token, setTokenState] = useState<string | null>(() => loadToken());
 
   const setToken = useCallback((next: string | null) => {
     setTokenState(next);
-    const settings = loadSettings();
-    saveSettings({ ...settings, token: next ?? undefined });
+    saveToken(next);
   }, []);
 
   const value = useMemo(() => ({ token, setToken }), [token, setToken]);
