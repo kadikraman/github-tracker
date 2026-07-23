@@ -2,11 +2,12 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react';
-import { useColorScheme } from 'react-native';
+import { Appearance, useColorScheme } from 'react-native';
 import { loadSettings, updateSettings } from '../storage/settings';
 import { darkPalette, lightPalette, type Palette, type ResolvedTheme, type ThemeMode } from '../theme';
 
@@ -27,6 +28,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setModeState(next);
     updateSettings({ themeMode: next });
   }, []);
+
+  // Sync the native window chrome (title bar) with the in-app theme choice;
+  // null restores following the system appearance.
+  useEffect(() => {
+    Appearance.setColorScheme(mode === 'system' ? null : mode);
+  }, [mode]);
 
   const resolved: ResolvedTheme = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const colors = resolved === 'dark' ? darkPalette : lightPalette;
