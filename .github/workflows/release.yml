@@ -78,12 +78,15 @@ jobs:
           echo "$APPSTORE_PRIVATE_KEY" > "$KEY_FILE"
 
           ditto -c -k --keepParent "$APP" notarize.zip
-          xcrun notarytool submit notarize.zip \
+          if ! xcrun notarytool submit notarize.zip \
             --key "$KEY_FILE" \
             --key-id "$APPSTORE_KEY_ID" \
             --issuer "$APPSTORE_ISSUER_ID" \
             --wait \
-            --output-format json | tee notarize-result.json
+            --output-format json | tee notarize-result.json; then
+            echo "::error::notarytool submit failed (see message above — 401 means bad API key credentials)"
+            exit 1
+          fi
           STATUS=$(python3 -c "import json; print(json.load(open('notarize-result.json'))['status'])")
           if [ "$STATUS" != "Accepted" ]; then
             SUBMISSION_ID=$(python3 -c "import json; print(json.load(open('notarize-result.json'))['id'])")
