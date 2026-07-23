@@ -2,6 +2,8 @@
 
 A personal macOS menu-style dashboard for the GitHub things you need to action, built with [Expo](https://expo.dev) + [react-native-macos](https://github.com/microsoft/react-native-macos) via the expo-desktop toolchain.
 
+<img width="1178" height="798" alt="Screenshot 2026-07-23 at 13 42 01" src="https://github.com/user-attachments/assets/389e6062-ab7f-4b60-a046-f132691840e8" />
+
 It shows four auto-updating sections, each backed by a GitHub search query:
 
 | Section | Query |
