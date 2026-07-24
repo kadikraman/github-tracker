@@ -80,6 +80,8 @@ PODS:
   - hermes-engine/Pre-built (0.81.6)
   - Keychain (1.0.0):
     - ExpoModulesCore
+  - MenuBar (1.0.0):
+    - ExpoModulesCore
   - RCT-Folly (2024.11.18.00):
     - boost
     - DoubleConversion
@@ -2345,6 +2347,7 @@ DEPENDENCIES:
   - glog (from `../node_modules/react-native-macos/third-party-podspecs/glog.podspec`)
   - hermes-engine (from `../node_modules/react-native-macos/sdks/hermes-engine/hermes-engine.podspec`)
   - Keychain (from `../modules/keychain/ios`)
+  - MenuBar (from `../modules/menubar/ios`)
   - RCT-Folly (from `../node_modules/react-native-macos/third-party-podspecs/RCT-Folly.podspec`)
   - RCTDeprecation (from `../node_modules/react-native-macos/ReactApple/Libraries/RCTFoundation/RCTDeprecation`)
   - RCTRequired (from `../node_modules/react-native-macos/Libraries/Required`)
@@ -2448,6 +2451,8 @@ EXTERNAL SOURCES:
     :tag: hermes-2025-07-07-RNv0.81.0-e0fc67142ec0763c6b6153ca2bf96df815539782
   Keychain:
     :path: "../modules/keychain/ios"
+  MenuBar:
+    :path: "../modules/menubar/ios"
   RCT-Folly:
     :podspec: "../node_modules/react-native-macos/third-party-podspecs/RCT-Folly.podspec"
   RCTDeprecation:
@@ -2593,6 +2598,7 @@ SPEC CHECKSUMS:
   glog: 0b31c25149b9d350b2666c7d459229861a00ec07
   hermes-engine: 7219f6e751ad6ec7f3d7ec121830ee34dae40749
   Keychain: 0c5a431da059a754ae89fa46d422c67dc97abbaa
+  MenuBar: 78e0ae0133c19384ece1c0714659e6562516cefa
   RCT-Folly: a3d9b23289a456c318f4814703664bdc33c771cc
   RCTDeprecation: 777decf5c531f5f1ce3cf2b292e9c4b07e0d3253
   RCTRequired: 52ab26a5abbaec60bc25f9b00e46c55be4facfc6
