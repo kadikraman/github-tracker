@@ -54,6 +54,8 @@ static void GHTClearBackgrounds(NSView *view, NSInteger depth)
   self.window.title = @"GitHub Tracker";
 // @generated end expo-desktop-window-title
 
+  self.window.releasedWhenClosed = NO;
+
   [self setupStatusItem];
   [[NSNotificationCenter defaultCenter] addObserver:self
                                            selector:@selector(openMainWindow)
