@@ -5,6 +5,7 @@ import MenuBar from '../../modules/menubar';
 import type { SectionKey } from '../api/github';
 import type { TrackedItem } from '../api/types';
 import { repoFullName } from '../components/ItemRow';
+import { OfflineBanner } from '../components/OfflineBanner';
 import { HiddenProvider, useHidden } from '../hooks/useHidden';
 import { ThemeProvider, useTheme } from '../hooks/useTheme';
 import { TokenProvider, useToken } from '../hooks/useToken';
@@ -76,7 +77,11 @@ function MenuBarSection({
       <View style={[styles.card, { backgroundColor: alpha(colors.card, 0.62) }]}>
         {visible.length === 0 ? (
           <Text style={[styles.emptyText, { color: colors.faint }]}>
-            {query.isPending ? 'Loading…' : query.error ? "Couldn't load" : 'Nothing to action'}
+            {query.isPending
+              ? 'Loading…'
+              : query.error && query.data === undefined
+                ? "Couldn't load"
+                : 'Nothing to action'}
           </Text>
         ) : (
           <>
@@ -121,16 +126,19 @@ function PopoverContent() {
   return (
     <View style={styles.container}>
       {token ? (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {SECTIONS.map((section) => (
-            <MenuBarSection
-              key={section.key}
-              title={section.title}
-              sectionKey={section.key}
-              accentKey={section.accentKey}
-            />
-          ))}
-        </ScrollView>
+        <>
+          <OfflineBanner />
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {SECTIONS.map((section) => (
+              <MenuBarSection
+                key={section.key}
+                title={section.title}
+                sectionKey={section.key}
+                accentKey={section.accentKey}
+              />
+            ))}
+          </ScrollView>
+        </>
       ) : (
         <View style={styles.noToken}>
           <Text style={[styles.noTokenText, { color: colors.muted }]}>

@@ -1,4 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { queryClient } from '../lib/queryClient';
+import { clearItemsCache } from '../storage/itemsCache';
 import { loadToken, saveToken } from '../storage/tokenStore';
 
 type TokenContextValue = {
@@ -14,6 +16,9 @@ export function TokenProvider({ children }: { children: ReactNode }) {
   const setToken = useCallback((next: string | null) => {
     setTokenState(next);
     saveToken(next);
+    // Clear the file before the queries so remounts can't re-seed from it.
+    clearItemsCache();
+    queryClient.removeQueries({ queryKey: ['items'] });
   }, []);
 
   const value = useMemo(() => ({ token, setToken }), [token, setToken]);

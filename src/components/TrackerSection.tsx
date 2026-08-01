@@ -57,7 +57,7 @@ export function TrackerSection({ title, accent, icon, query, hiddenIds, onHide, 
       <View style={[styles.card, { backgroundColor: colors.card }, colors.shadow]}>
         {query.isPending ? (
           <ActivityIndicator style={styles.stateBlock} color={colors.muted} />
-        ) : query.error ? (
+        ) : query.error && query.data === undefined ? (
           <View style={styles.stateBlock}>
             <Text style={[styles.errorText, { color: colors.danger }]}>
               {query.error.message}

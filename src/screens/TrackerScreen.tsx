@@ -22,6 +22,7 @@ import {
   SlidersIcon,
   SunIcon,
 } from '../components/icons';
+import { OfflineBanner } from '../components/OfflineBanner';
 import { useHidden } from '../hooks/useHidden';
 import { useTheme } from '../hooks/useTheme';
 import { useTrackedItems } from '../hooks/useTrackedItems';
@@ -197,6 +198,8 @@ export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }
           </ToolbarButton>
         </View>
       </View>
+
+      <OfflineBanner lastUpdatedAt={lastUpdatedAt > 0 ? lastUpdatedAt : undefined} />
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.listContent}>
         <View style={styles.summaryGrid}>
