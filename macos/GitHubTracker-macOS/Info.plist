@@ -63,6 +63,6 @@
 	<key>SUFeedURL</key>
 	<string>https://github.com/kadikraman/github-tracker/releases/latest/download/appcast.xml</string>
 	<key>SUPublicEDKey</key>
-	<string>REPLACE_WITH_PUBLIC_KEY_FROM_generate_keys</string>
+	<string>nC6Zfwt+TImaAV4Zvhc+bqUEC0tGXsJfsagj236lVw0=</string>
 </dict>
 </plist>

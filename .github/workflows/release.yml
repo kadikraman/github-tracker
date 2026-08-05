@@ -68,6 +68,26 @@ jobs:
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
             build
 
+      # Plain `xcodebuild build` + the CocoaPods embed script re-sign only the
+      # Sparkle framework binary, not its nested XPC services and helpers.
+      # Notarization requires every nested binary to be Developer ID signed
+      # with hardened runtime. Sign inside-out; never use --deep (it breaks
+      # the XPC services, per Sparkle's docs).
+      - name: Re-sign Sparkle helpers
+        run: |
+          APP="macos/build/Build/Products/Release/GitHubTracker.app"
+          FW="$APP/Contents/Frameworks/Sparkle.framework"
+          ID="Developer ID Application"
+          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/XPCServices/Installer.xpc"
+          codesign -f -o runtime --timestamp --preserve-metadata=entitlements -s "$ID" "$FW/Versions/B/XPCServices/Downloader.xpc"
+          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/Autoupdate"
+          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/Updater.app"
+          codesign -f -o runtime --timestamp -s "$ID" "$FW"
+          codesign -f -o runtime --timestamp \
+            --entitlements macos/GitHubTracker-macOS/GitHubTracker.entitlements \
+            -s "$ID" "$APP"
+          codesign --verify --strict --deep "$APP"
+
       - name: Notarize and staple
         env:
           APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
@@ -103,11 +123,30 @@ jobs:
           ditto -c -k --keepParent "$APP" "GitHubTracker-$VERSION.zip"
           rm "$KEY_FILE" notarize.zip
 
+      # The appcast is Sparkle's update feed. generate_appcast (from the
+      # Sparkle pod, so version-matched to the framework) reads the version
+      # info from the app inside the zip and signs the entry with the EdDSA
+      # private key. Installed apps fetch it from the stable URL
+      # releases/latest/download/appcast.xml; the zip URL itself is versioned.
+      - name: Generate appcast
+        env:
+          SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir appcast-work
+          cp "GitHubTracker-$VERSION.zip" appcast-work/
+          echo -n "$SPARKLE_ED_PRIVATE_KEY" | ./macos/Pods/Sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/kadikraman/github-tracker/releases/download/${GITHUB_REF_NAME}/" \
+            --link "https://github.com/kadikraman/github-tracker" \
+            -o appcast.xml appcast-work
+          cat appcast.xml
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" "GitHubTracker-$VERSION.zip" \
+          gh release create "$GITHUB_REF_NAME" "GitHubTracker-$VERSION.zip" appcast.xml \
             --title "GitHub Tracker $VERSION" \
             --generate-notes

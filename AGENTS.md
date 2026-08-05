@@ -53,6 +53,14 @@ Small synchronous JSON files in `Paths.document` via the expo-file-system `File`
 - `OfflineBanner` (`src/components/OfflineBanner.tsx`) renders in both surfaces. Section error UI shows only when `query.data === undefined`; a failed background refetch keeps showing cached rows.
 - Clearing or replacing the token clears the item cache file first, then `removeQueries`, in that order (remounting queries must not re-seed from the deleted file).
 
+## Auto-updates (Sparkle)
+
+- `modules/updater` owns an `SPUUpdater` with a custom `SPUUserDriver`, so Sparkle shows no windows; all state flows to JS via the `onUpdateStatus` event into `src/lib/updateStatus.ts` (module-scope state, both surfaces). `UpdateBanner` renders next to `OfflineBanner`; Settings has version + check/restart controls.
+- Downloads are automatic. The driver parks Sparkle's final install reply until JS calls `installAndRelaunch()`; quitting instead still installs on termination.
+- Debug builds skip the updater unless `defaults write dev.kadi.github-tracker GHTEnableUpdaterInDebug -bool YES`.
+- Feed: `SUFeedURL` in Info.plist points at `releases/latest/download/appcast.xml`; the release workflow generates and signs `appcast.xml` (EdDSA key in the `SPARKLE_ED_PRIVATE_KEY` secret) and re-signs Sparkle's nested XPC helpers before notarization (never `codesign --deep`).
+- The app stays sandboxed: `SUEnableInstallerLauncherService` + the `-spks`/`-spki` mach-lookup entitlement exceptions. No `SUEnableDownloaderService` (network.client is present).
+
 ## UI conventions
 
 - Theme via `useTheme()` + `Palette` in `src/theme.ts`; `alpha(hex, opacity)` for tints. No SVG dependency; icons are hand-built Views in `src/components/icons.tsx`.
