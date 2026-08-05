@@ -2329,6 +2329,10 @@ PODS:
     - React-utils (= 0.81.8)
     - SocketRocket
   - SocketRocket (0.7.1)
+  - Sparkle (2.9.5)
+  - Updater (1.0.0):
+    - ExpoModulesCore
+    - Sparkle (~> 2.9)
   - Yoga (0.0.0)
 
 DEPENDENCIES:
@@ -2413,11 +2417,13 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native-macos/ReactCommon`)
   - SocketRocket (~> 0.7.1)
+  - Updater (from `../modules/updater/ios`)
   - Yoga (from `../node_modules/react-native-macos/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
     - SocketRocket
+    - Sparkle
 
 EXTERNAL SOURCES:
   boost:
@@ -2579,6 +2585,8 @@ EXTERNAL SOURCES:
     :path: build/generated/ios
   ReactCommon:
     :path: "../node_modules/react-native-macos/ReactCommon"
+  Updater:
+    :path: "../modules/updater/ios"
   Yoga:
     :path: "../node_modules/react-native-macos/ReactCommon/yoga"
 
@@ -2663,6 +2671,8 @@ SPEC CHECKSUMS:
   ReactCodegen: ea8f85c599f24af781991c7cd80826d2c08744fa
   ReactCommon: ef913092a4501cf30c176155312c30abc82dbd34
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
+  Sparkle: 3ed3ee66c8526fcba244d06edef5f009d3bbc6ba
+  Updater: 79a2b1b420a84f6b89c5ac08ff82acfc0d9e0bb0
   Yoga: 9f9bacf26f441fa32d25c32e5583ff72f6d2806d
 
 PODFILE CHECKSUM: f1f3022aa6adabbbdabb8481f4cae96137dee3fa

@@ -23,6 +23,7 @@ import {
   SunIcon,
 } from '../components/icons';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { UpdateBanner } from '../components/UpdateBanner';
 import { useHidden } from '../hooks/useHidden';
 import { useTheme } from '../hooks/useTheme';
 import { useTrackedItems } from '../hooks/useTrackedItems';
@@ -200,6 +201,7 @@ export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }
       </View>
 
       <OfflineBanner lastUpdatedAt={lastUpdatedAt > 0 ? lastUpdatedAt : undefined} />
+      <UpdateBanner />
 
       <ScrollView ref={scrollRef} contentContainerStyle={styles.listContent}>
         <View style={styles.summaryGrid}>

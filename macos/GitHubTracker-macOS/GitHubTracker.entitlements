@@ -8,5 +8,11 @@
     <true/>
     <key>com.apple.security.network.client</key>
     <true/>
+    <!-- Sparkle installer XPC services; required for sandboxed apps. -->
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+      <string>dev.kadi.github-tracker-spks</string>
+      <string>dev.kadi.github-tracker-spki</string>
+    </array>
   </dict>
 </plist>

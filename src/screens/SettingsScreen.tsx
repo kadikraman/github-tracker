@@ -10,6 +10,12 @@ import {
 import { fetchViewer } from '../api/github';
 import { useTheme } from '../hooks/useTheme';
 import { useToken } from '../hooks/useToken';
+import {
+  checkForUpdates,
+  getCurrentVersion,
+  installAndRelaunch,
+  useUpdateStatus,
+} from '../lib/updateStatus';
 import { appBadgeColor } from '../theme';
 
 export function SettingsScreen({ onDone }: { onDone?: () => void }) {
@@ -119,7 +125,53 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
             </Pressable>
           ) : null}
         </View>
+        <UpdatesCard />
       </View>
+    </View>
+  );
+}
+
+function UpdatesCard() {
+  const { colors } = useTheme();
+  const update = useUpdateStatus();
+  const { version, build } = getCurrentVersion();
+
+  const statusLabel = {
+    idle: null,
+    checking: 'Checking for updates…',
+    downloading: `Downloading update${update.version ? ` ${update.version}` : ''}…`,
+    ready: `Update${update.version ? ` ${update.version}` : ''} is ready.`,
+    installing: 'Installing update…',
+    upToDate: 'The app is up to date.',
+    error: update.message ?? 'The update check failed.',
+  }[update.phase];
+  const statusColor =
+    update.phase === 'error'
+      ? colors.danger
+      : update.phase === 'ready' || update.phase === 'upToDate'
+        ? colors.success
+        : colors.muted;
+  const busy =
+    update.phase === 'checking' || update.phase === 'downloading' || update.phase === 'installing';
+
+  return (
+    <View style={[styles.card, styles.updatesCard, { backgroundColor: colors.card }, colors.shadow]}>
+      <Text style={[styles.label, { color: colors.muted }]}>Updates</Text>
+      <Text style={[styles.helpText, { color: colors.muted }]}>
+        GitHub Tracker {version} (build {build})
+      </Text>
+      {statusLabel ? (
+        <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+      ) : null}
+      <Pressable
+        onPress={() => (update.phase === 'ready' ? installAndRelaunch() : checkForUpdates())}
+        disabled={busy}
+        style={[styles.clearButton, { backgroundColor: colors.sunken, opacity: busy ? 0.5 : 1 }]}
+      >
+        <Text style={[styles.clearButtonText, { color: colors.text }]}>
+          {update.phase === 'ready' ? 'Restart to update' : 'Check for updates'}
+        </Text>
+      </Pressable>
     </View>
   );
 }
@@ -158,6 +210,9 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 10,
     maxWidth: 560,
+  },
+  updatesCard: {
+    marginTop: 18,
   },
   label: {
     fontSize: 12,
