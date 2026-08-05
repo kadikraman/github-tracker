@@ -30,6 +30,7 @@ Both trees run in the same JS runtime and bridge. Consequences:
 - JS -> native goes through `modules/menubar` (Swift, Expo Modules API), which posts `NSNotificationCenter` names `GHTOpenMainWindow` / `GHTClosePopover`; `AppDelegate` observes them.
 - Gotcha: any programmatically created `NSWindow` held in a strong property needs `releasedWhenClosed = NO`, or closing it leaves a dangling pointer and the next use crashes in `objc_retain`. This bit us once with `self.window`; the panel sets it too.
 - `modules/keychain` (Swift) stores the GitHub token (service `dev.kadi.github-tracker`). Local Expo modules live in `modules/*/ios/` and are used for macOS as well.
+- Versioning: `Info.plist` uses `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`; defaults live in `project.pbxproj`, and the release workflow overrides both on the `xcodebuild` command line (`MARKETING_VERSION` from the tag, `CURRENT_PROJECT_VERSION` from `GITHUB_RUN_NUMBER`). Do not run `expo prebuild`: the expo-desktop `Version` config plugin would rewrite the plist entries back to literal strings from `app.json`.
 
 ## Data layer
 
