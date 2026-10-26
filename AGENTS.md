@@ -48,7 +48,7 @@ Small synchronous JSON files via the expo-file-system `File` API, read once at m
 
 - `src/storage/settings.ts` -> `settings.json` (theme, hidden items).
 - `src/storage/itemsCache.ts` -> `items-cache.json` (versioned per-section item cache).
-- The token lives in `@legendapp/spark/secure-storage` (`src/storage/tokenStore.ts`). It is async: `useToken()` reports `loaded`, and roots render nothing until it is true, so Settings does not flash. The first read is cached at module scope for the second root.
+- The token lives in `@legendapp/spark/secure-storage` (`src/storage/tokenStore.ts`). It is async: `useToken()` reports `loaded`, and roots render nothing until it is true, so Settings does not flash. The token is module-scope state that both roots subscribe to (`useSyncExternalStore`): the popover root stays mounted while hidden, so a token saved in the main window must reach it.
 
 ## Offline support
 
