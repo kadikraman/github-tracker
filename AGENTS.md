@@ -29,6 +29,7 @@ Both trees run in the same JS runtime and bridge. Consequences:
 ## Native side (owned by Spark)
 
 - There is no committed `macos/` folder. Spark generates the native project from `desktop.config.json` into `macos/` (gitignored, disposable) and owns the AppDelegate. Native settings go in `desktop.config.json`, never in generated files. Keep its `projectId`: it scopes secure storage, the update key account and Spark's single-instance lock.
+- App icon: neither Spark nor Expo Desktop builds a macOS icon set from `expo.icon`. `plugins/withMacosAppIcon.js` (in `expo.plugins`) copies `assets/AppIcon.appiconset` over the generated one; edit the PNGs there.
 - `src/lib/menuBar.ts` owns the tray item (`@legendapp/spark/tray`, SF Symbol `arrow.triangle.pull`) and the popover window. The popover is `kind: 'overlay'` with `titleBarStyle: 'hidden'`: overlay keeps it visible while another app is active, and a titled window can become key, so `focusChanged false` hides it on an outside click. A borderless window never becomes key; a `panelStyle` panel hides itself whenever the app is inactive. Evidence: vault plan 005 `prototype.md`.
 - The tray API gives no status item frame. The popover centres on the cursor at click time.
 - The popover native window survives a JS reload; `menuBar.ts` finds it with `listWindows()` instead of keeping a flag.

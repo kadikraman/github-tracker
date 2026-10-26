@@ -47,7 +47,10 @@
       "infoPlist": {
         "CFBundleName": "GitHub Tracker"
       }
-    }
+    },
+    "plugins": [
+      "./plugins/withMacosAppIcon"
+    ]
   },
   "projectId": "11d70c57-b739-47cf-b00b-a1a6e08832cf",
   "updates": {
