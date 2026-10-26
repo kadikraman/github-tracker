@@ -1,6 +1,7 @@
-import { File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
 import type { SectionKey } from '../api/github';
 import type { TrackedItem } from '../api/types';
+import { dataDirectory } from './dataDirectory';
 
 export type CachedSection = {
   items: TrackedItem[];
@@ -14,7 +15,7 @@ type ItemsCache = {
 
 const CACHE_VERSION = 1;
 
-const cacheFile = new File(Paths.document, 'items-cache.json');
+const cacheFile = new File(dataDirectory, 'items-cache.json');
 
 function emptyCache(): ItemsCache {
   return { version: CACHE_VERSION, sections: {} };

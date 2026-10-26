@@ -9,9 +9,12 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TrackerScreen } from './src/screens/TrackerScreen';
 
 function Root() {
-  const { token } = useToken();
+  const { token, loaded } = useToken();
   const [screen, setScreen] = useState<'tracker' | 'settings'>('tracker');
 
+  if (!loaded) {
+    return null;
+  }
   if (!token) {
     return <SettingsScreen />;
   }

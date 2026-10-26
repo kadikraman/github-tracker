@@ -4,11 +4,13 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v54.0.0/ before 
 
 # GitHub Tracker
 
-A macOS-only desktop app (Expo SDK 54 + react-native-macos 0.81, via expo-desktop) that tracks your GitHub PRs, reviews, mentions, and issues. It has a main window and a menu bar popover.
+A macOS-only desktop app on [Legend Spark](https://legend.so/spark/) (Spark 0.0.1 on Expo Desktop, Expo SDK 54, react-native-macos 0.81) that tracks your GitHub PRs, reviews, mentions, and issues. It has a main window and a menu bar popover.
 
 ## Commands
 
-- `bun run macos` builds and runs the app (Debug, DerivedData).
+- `bun run macos` starts the Spark dev session (Expo CLI + Metro) and opens the custom dev build. Native config changes (`desktop.config.json`) need `npx --no-install spark build --dev` first.
+- `bun run build` makes a standalone, ad-hoc signed release app; `npx --no-install spark open` launches it. `bun run package` signs, notarizes and writes `dist/` (see Releases).
+- Requires Node 24.19+, Xcode and CocoaPods. `bun run doctor` checks pins and tooling; keep React, React Native and Expo on Spark's exact pins.
 - `npx tsc --noEmit` typechecks. There are no tests.
 - No Expo Router. Navigation is a `useState` switch in `App.tsx` (Settings vs Tracker).
 
@@ -16,21 +18,23 @@ A macOS-only desktop app (Expo SDK 54 + react-native-macos 0.81, via expo-deskto
 
 `index.ts` registers both roots:
 
-- `main` -> `App.tsx` (main window)
-- `GitHubTrackerMenuBar` -> `src/screens/MenuBarApp.tsx` (menu bar popover)
+- `main` -> `App.tsx` (main window, created by Spark's host)
+- `GitHubTrackerMenuBar` -> `src/screens/MenuBarApp.tsx` (menu bar popover, a Spark window opened by `src/lib/menuBar.ts`)
 
 Both trees run in the same JS runtime and bridge. Consequences:
 
 - Module-scope code runs exactly once, no matter how often either root mounts. The `queryClient` singleton (`src/lib/queryClient.ts`) is shared, so fetched data and invalidations serve both surfaces. Its module-scope query-cache subscriber persists items to disk and drives the offline flag.
 - React contexts are NOT shared. Each root mounts its own ThemeProvider/TokenProvider/HiddenProvider; a change in one surface reaches the other only through module-level state or a remount.
 
-## Native side (macos/GitHubTracker-macOS/)
+## Native side (owned by Spark)
 
-- `AppDelegate.mm` owns the `NSStatusItem` and a borderless `NSPanel` popover (glass effect on macOS 26+, `NSVisualEffectView` fallback). The panel hosts a second RN surface created from the same `rootViewFactory`.
-- JS -> native goes through `modules/menubar` (Swift, Expo Modules API), which posts `NSNotificationCenter` names `GHTOpenMainWindow` / `GHTClosePopover`; `AppDelegate` observes them.
-- Gotcha: any programmatically created `NSWindow` held in a strong property needs `releasedWhenClosed = NO`, or closing it leaves a dangling pointer and the next use crashes in `objc_retain`. This bit us once with `self.window`; the panel sets it too.
-- `modules/keychain` (Swift) stores the GitHub token (service `dev.kadi.github-tracker`). Local Expo modules live in `modules/*/ios/` and are used for macOS as well.
-- Versioning: `Info.plist` uses `$(MARKETING_VERSION)` / `$(CURRENT_PROJECT_VERSION)`; defaults live in `project.pbxproj`, and the release workflow overrides both on the `xcodebuild` command line (`MARKETING_VERSION` from the tag, `CURRENT_PROJECT_VERSION` from `GITHUB_RUN_NUMBER`). Do not run `expo prebuild`: the expo-desktop `Version` config plugin would rewrite the plist entries back to literal strings from `app.json`.
+- There is no committed `macos/` folder. Spark generates the native project from `desktop.config.json` into `macos/` (gitignored, disposable) and owns the AppDelegate. Native settings go in `desktop.config.json`, never in generated files. Keep its `projectId`: it scopes secure storage, the update key account and Spark's single-instance lock.
+- `src/lib/menuBar.ts` owns the tray item (`@legendapp/spark/tray`, SF Symbol `arrow.triangle.pull`) and the popover window. The popover is `kind: 'overlay'` with `titleBarStyle: 'hidden'`: overlay keeps it visible while another app is active, and a titled window can become key, so `focusChanged false` hides it on an outside click. A borderless window never becomes key; a `panelStyle` panel hides itself whenever the app is inactive. Evidence: vault plan 005 `prototype.md`.
+- The tray API gives no status item frame. The popover centres on the cursor at click time.
+- The popover native window survives a JS reload; `menuBar.ts` finds it with `listWindows()` instead of keeping a flag.
+- The main window hides on close (`macos.lifecycle.mainWindow.closeBehavior: "hide"`), so **Open GitHub Tracker** in the popover can `showWindow('main')` again.
+- Popover glass: `GlassView` from `@legendapp/spark/ui/glass` on macOS 26+, with the window `transparent` and `backgroundColor: '#00000000'`. Older systems get `appBg`.
+- The app is not sandboxed (Spark's default). Entitlements live in `desktop.config.json` under `macos.entitlements`.
 
 ## Data layer
 
@@ -40,11 +44,11 @@ Both trees run in the same JS runtime and bridge. Consequences:
 
 ## Persistence pattern
 
-Small synchronous JSON files in `Paths.document` via the expo-file-system `File` API, read once at module load so cold starts render without async hydration flash:
+Small synchronous JSON files via the expo-file-system `File` API, read once at module load so cold starts render without async hydration flash. They live in `~/Library/Application Support/dev.kadi.github-tracker` (`src/storage/dataDirectory.ts`): without the sandbox, `Paths.document` is the user's `~/Documents`, so never write there.
 
-- `src/storage/settings.ts` -> `settings.json` (theme, hidden items; token field is legacy/migrated).
+- `src/storage/settings.ts` -> `settings.json` (theme, hidden items).
 - `src/storage/itemsCache.ts` -> `items-cache.json` (versioned per-section item cache).
-- Token itself lives in the Keychain (`src/storage/tokenStore.ts`).
+- The token lives in `@legendapp/spark/secure-storage` (`src/storage/tokenStore.ts`). It is async: `useToken()` reports `loaded`, and roots render nothing until it is true, so Settings does not flash. The first read is cached at module scope for the second root.
 
 ## Offline support
 
@@ -53,15 +57,19 @@ Small synchronous JSON files in `Paths.document` via the expo-file-system `File`
 - `OfflineBanner` (`src/components/OfflineBanner.tsx`) renders in both surfaces. Section error UI shows only when `query.data === undefined`; a failed background refetch keeps showing cached rows.
 - Clearing or replacing the token clears the item cache file first, then `removeQueries`, in that order (remounting queries must not re-seed from the deleted file).
 
-## Auto-updates (Sparkle)
+## Auto-updates and releases
 
-- `modules/updater` owns an `SPUUpdater` with a custom `SPUUserDriver`, so Sparkle shows no windows; all state flows to JS via the `onUpdateStatus` event into `src/lib/updateStatus.ts` (module-scope state, both surfaces). `UpdateBanner` renders next to `OfflineBanner`; Settings has version + check/restart controls.
-- Downloads are automatic. The driver parks Sparkle's final install reply until JS calls `installAndRelaunch()`; quitting instead still installs on termination.
-- Debug builds skip the updater unless `defaults write dev.kadi.github-tracker GHTEnableUpdaterInDebug -bool YES`.
-- Feed: `SUFeedURL` in Info.plist points at `releases/latest/download/appcast.xml`; the release workflow generates and signs `appcast.xml` (EdDSA key in the `SPARKLE_ED_PRIVATE_KEY` secret) and re-signs Sparkle's nested XPC helpers before notarization (never `codesign --deep`).
-- The app stays sandboxed: `SUEnableInstallerLauncherService` + the `-spks`/`-spki` mach-lookup entitlement exceptions. No `SUEnableDownloaderService` (network.client is present).
+- `@legendapp/spark/updates` (Sparkle 2.9.6, Sparkle's own windows). `src/lib/updateStatus.ts` turns on automatic checks at module load and keeps module-scope status for both roots; Settings shows the version and **Check for updates**. Dev builds report updates as unavailable.
+- Feed and public key are `updates` in `desktop.config.json`. The private key is in the login Keychain under `spark.<projectId>` (made by `spark updates init`) and in the `SPARKLE_ED_PRIVATE_KEY` secret for CI. Export it with Sparkle's `generate_keys --account spark.<projectId> -x <file>`.
+- `.github/workflows/release.yml` runs on a `v*` tag: sets `version` from the tag and `macos.buildNumber` from `GITHUB_RUN_NUMBER` (must keep increasing), imports the Developer ID cert and a notarytool profile into a temporary keychain, imports the Sparkle key, then loops `spark package` (exit 2 means notarization is pending) and uploads `dist/updates/*.zip` and `appcast.xml`.
+- Installed apps read `releases/latest/download/appcast.xml`; the appcast points at the archive in the same release.
 
 ## UI conventions
 
 - Theme via `useTheme()` + `Palette` in `src/theme.ts`; `alpha(hex, opacity)` for tints. No SVG dependency; icons are hand-built Views in `src/components/icons.tsx`.
 - Main window and popover do not share row/section components (`TrackerSection`/`ItemRow` vs the compact ones inside `MenuBarApp.tsx`). Shared layers are hooks, api, storage, lib, and theme.
+
+<!-- spark:skill:start -->
+From the app root, read [Spark's app development skill](node_modules/@legendapp/spark/skills/spark/SKILL.md) before working on this app.
+The installed Spark version owns these instructions; do not copy them here.
+<!-- spark:skill:end -->

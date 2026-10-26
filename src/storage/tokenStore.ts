@@ -1,25 +1,33 @@
-import Keychain from '../../modules/keychain';
-import { loadSettings, updateSettings } from './settings';
+import { deleteItemAsync, getItemAsync, setItemAsync } from '@legendapp/spark/secure-storage';
 
-const SERVICE = 'dev.kadi.github-tracker';
-const ACCOUNT = 'github-token';
+const KEY = 'github-token';
 
-export function loadToken(): string | null {
-  // One-time migration: earlier versions kept the token in plaintext
-  // settings.json. Move it into the Keychain and scrub the file.
-  const legacy = loadSettings().token;
-  if (legacy) {
-    Keychain.set(SERVICE, ACCOUNT, legacy);
-    updateSettings({ token: undefined });
-    return legacy;
-  }
-  return Keychain.get(SERVICE, ACCOUNT);
+// Secure storage is async, but both React roots share this JS runtime: the
+// first load is cached here so a root that mounts later renders at once.
+let cached: string | null | undefined;
+const loading = getItemAsync(KEY)
+  .catch(() => null)
+  .then((token) => {
+    if (cached === undefined) {
+      cached = token;
+    }
+    return cached;
+  });
+
+/** The token, or undefined while the first secure-storage read is pending. */
+export function peekToken(): string | null | undefined {
+  return cached;
 }
 
-export function saveToken(token: string | null): void {
+export function loadToken(): Promise<string | null> {
+  return loading;
+}
+
+export async function saveToken(token: string | null): Promise<void> {
+  cached = token;
   if (token == null) {
-    Keychain.remove(SERVICE, ACCOUNT);
+    await deleteItemAsync(KEY);
   } else {
-    Keychain.set(SERVICE, ACCOUNT, token);
+    await setItemAsync(KEY, token);
   }
 }

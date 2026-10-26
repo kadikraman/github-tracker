@@ -18,24 +18,36 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      # node is needed by the Podfile's autolinking and the Xcode JS-bundle phase
+      # Spark's tooling needs Node 24.19 or later; bun manages dependencies.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Install JS dependencies
         run: bun install --frozen-lockfile
 
-      - name: Install pods
-        run: RCT_NEW_ARCH_ENABLED=1 pod install
-        working-directory: macos
+      # desktop.config.json is the source of the app version. The tag sets the
+      # user-visible version; the run number is the build number Sparkle
+      # orders updates by, so it must keep increasing.
+      - name: Set version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          jq --arg v "$VERSION" --arg b "$GITHUB_RUN_NUMBER" \
+            '.version = $v | .macos.buildNumber = $b | .expo.version = $v | .expo.macos.version = $v | .expo.macos.buildNumber = $b' \
+            desktop.config.json > desktop.config.json.tmp
+          mv desktop.config.json.tmp desktop.config.json
 
-      - name: Import Developer ID certificate
+      # One temporary keychain holds the Developer ID identity and the
+      # notarytool profile; spark package reads both from it.
+      - name: Prepare signing keychain
         env:
           MACOS_CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
         run: |
           KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
           KEYCHAIN_PASSWORD="$(uuidgen)"
@@ -50,103 +62,68 @@ jobs:
           security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
           rm "$RUNNER_TEMP/cert.p12"
 
-      - name: Build (Release, Developer ID, hardened runtime)
-        working-directory: macos
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          xcodebuild -workspace GitHubTracker.xcworkspace \
-            -scheme GitHubTracker-macOS \
-            -configuration Release \
-            -derivedDataPath build \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Developer ID Application" \
-            DEVELOPMENT_TEAM=XQAX5LF48P \
-            ENABLE_HARDENED_RUNTIME=YES \
-            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
-            OTHER_CODE_SIGN_FLAGS="--timestamp" \
-            MARKETING_VERSION="$VERSION" \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
-            build
-
-      # Plain `xcodebuild build` + the CocoaPods embed script re-sign only the
-      # Sparkle framework binary, not its nested XPC services and helpers.
-      # Notarization requires every nested binary to be Developer ID signed
-      # with hardened runtime. Sign inside-out; never use --deep (it breaks
-      # the XPC services, per Sparkle's docs).
-      - name: Re-sign Sparkle helpers
-        run: |
-          APP="macos/build/Build/Products/Release/GitHubTracker.app"
-          FW="$APP/Contents/Frameworks/Sparkle.framework"
-          ID="Developer ID Application"
-          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/XPCServices/Installer.xpc"
-          codesign -f -o runtime --timestamp --preserve-metadata=entitlements -s "$ID" "$FW/Versions/B/XPCServices/Downloader.xpc"
-          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/Autoupdate"
-          codesign -f -o runtime --timestamp -s "$ID" "$FW/Versions/B/Updater.app"
-          codesign -f -o runtime --timestamp -s "$ID" "$FW"
-          codesign -f -o runtime --timestamp \
-            --entitlements macos/GitHubTracker-macOS/GitHubTracker.entitlements \
-            -s "$ID" "$APP"
-          codesign --verify --strict --deep "$APP"
-
-      - name: Notarize and staple
-        env:
-          APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
-          APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
-          APPSTORE_PRIVATE_KEY: ${{ secrets.APPSTORE_PRIVATE_KEY }}
-        run: |
-          APP="macos/build/Build/Products/Release/GitHubTracker.app"
           KEY_FILE="$RUNNER_TEMP/AuthKey.p8"
           echo "$APPSTORE_PRIVATE_KEY" > "$KEY_FILE"
+          xcrun notarytool store-credentials github-tracker-notary \
+            --key "$KEY_FILE" --key-id "$APPSTORE_KEY_ID" --issuer "$APPSTORE_ISSUER_ID" \
+            --keychain "$KEYCHAIN_PATH"
+          rm "$KEY_FILE"
+          echo "SPARK_SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
-          ditto -c -k --keepParent "$APP" notarize.zip
-          if ! xcrun notarytool submit notarize.zip \
-            --key "$KEY_FILE" \
-            --key-id "$APPSTORE_KEY_ID" \
-            --issuer "$APPSTORE_ISSUER_ID" \
-            --wait \
-            --output-format json | tee notarize-result.json; then
-            echo "::error::notarytool submit failed (see message above — 401 means bad API key credentials)"
-            exit 1
-          fi
-          STATUS=$(python3 -c "import json; print(json.load(open('notarize-result.json'))['status'])")
-          if [ "$STATUS" != "Accepted" ]; then
-            SUBMISSION_ID=$(python3 -c "import json; print(json.load(open('notarize-result.json'))['id'])")
-            xcrun notarytool log "$SUBMISSION_ID" \
-              --key "$KEY_FILE" --key-id "$APPSTORE_KEY_ID" --issuer "$APPSTORE_ISSUER_ID"
-            exit 1
-          fi
-
-          xcrun stapler staple "$APP"
-          xcrun stapler validate "$APP"
-
-          VERSION="${GITHUB_REF_NAME#v}"
-          ditto -c -k --keepParent "$APP" "GitHubTracker-$VERSION.zip"
-          rm "$KEY_FILE" notarize.zip
-
-      # The appcast is Sparkle's update feed. generate_appcast (from the
-      # Sparkle pod, so version-matched to the framework) reads the version
-      # info from the app inside the zip and signs the entry with the EdDSA
-      # private key. Installed apps fetch it from the stable URL
-      # releases/latest/download/appcast.xml; the zip URL itself is versioned.
-      - name: Generate appcast
+      # spark package signs the update feed with the Sparkle key stored in the
+      # Keychain under spark.<projectId>. Sparkle's generate_keys imports it.
+      - name: Import Sparkle update key
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          mkdir appcast-work
-          cp "GitHubTracker-$VERSION.zip" appcast-work/
-          echo -n "$SPARKLE_ED_PRIVATE_KEY" | ./macos/Pods/Sparkle/bin/generate_appcast \
-            --ed-key-file - \
-            --download-url-prefix "https://github.com/kadikraman/github-tracker/releases/download/${GITHUB_REF_NAME}/" \
-            --link "https://github.com/kadikraman/github-tracker" \
-            -o appcast.xml appcast-work
-          cat appcast.xml
+          # Same checksum-pinned tools spark package downloads, at the path it reuses.
+          TOOLS=~/.spark/tools/sparkle-2.9.6
+          curl -fsSL -o "$RUNNER_TEMP/sparkle.tar.xz" \
+            https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz
+          echo "52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192  $RUNNER_TEMP/sparkle.tar.xz" | shasum -a 256 -c
+          mkdir -p "$TOOLS"
+          tar -xJf "$RUNNER_TEMP/sparkle.tar.xz" -C "$TOOLS"
 
+          PROJECT_ID="$(jq -r .projectId desktop.config.json)"
+          KEY_FILE="$RUNNER_TEMP/sparkle.key"
+          echo -n "$SPARKLE_ED_PRIVATE_KEY" > "$KEY_FILE"
+          "$TOOLS/bin/generate_keys" --account "spark.$PROJECT_ID" -f "$KEY_FILE"
+          rm "$KEY_FILE"
+          PUBLIC_KEY="$("$TOOLS/bin/generate_keys" --account "spark.$PROJECT_ID" -p)"
+          if [ "$PUBLIC_KEY" != "$(jq -r .updates.publicKey desktop.config.json)" ]; then
+            echo "::error::SPARKLE_ED_PRIVATE_KEY does not match updates.publicKey in desktop.config.json"
+            exit 1
+          fi
+
+      # Builds the release app, signs it with Developer ID, notarizes, staples
+      # and verifies it, then signs the update archive and appcast into
+      # dist/updates. It exits 2 while Apple is still processing; rerunning
+      # resumes the same submission.
+      - name: Build, sign and notarize
+        env:
+          SPARK_DEVELOPER_ID_APPLICATION: 'Developer ID Application: Kadi Kraman (XQAX5LF48P)'
+          SPARK_TEAM_ID: XQAX5LF48P
+          SPARK_NOTARY_KEYCHAIN_PROFILE: github-tracker-notary
+        run: |
+          for attempt in $(seq 1 15); do
+            status=0
+            npx --no-install spark package < /dev/null || status=$?
+            if [ "$status" -ne 2 ]; then
+              exit "$status"
+            fi
+            echo "Notarization still in progress; retrying in 60s (attempt $attempt)"
+            sleep 60
+          done
+          echo "::error::Notarization did not finish in time"
+          exit 1
+
+      # Installed apps read the feed at releases/latest/download/appcast.xml,
+      # and the appcast points at the archive next to it in the same release.
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" "GitHubTracker-$VERSION.zip" appcast.xml \
+          gh release create "$GITHUB_REF_NAME" dist/updates/*.zip dist/updates/appcast.xml \
             --title "GitHub Tracker $VERSION" \
             --generate-notes

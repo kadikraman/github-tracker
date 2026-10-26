@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/@legendapp/spark/schema.json",
+  "name": "GitHub Tracker",
+  "version": "2.0.0",
+  "window": {
+    "title": "GitHub Tracker",
+    "size": {
+      "width": 1180,
+      "height": 800
+    },
+    "minSize": {
+      "width": 760,
+      "height": 480
+    },
+    "restoreBounds": true
+  },
+  "macos": {
+    "buildNumber": "1",
+    "bundleIdentifier": "dev.kadi.github-tracker",
+    "entitlements": {
+      "com.apple.security.network.client": true
+    },
+    "infoPlist": {
+      "CFBundleName": "GitHub Tracker"
+    },
+    "lifecycle": {
+      "mainWindow": {
+        "closeBehavior": "hide"
+      }
+    }
+  },
+  "platforms": [
+    "macos"
+  ],
+  "expo": {
+    "name": "GitHub Tracker",
+    "slug": "GitHubTracker",
+    "version": "2.0.0",
+    "platforms": [
+      "macos"
+    ],
+    "icon": "./assets/icon.png",
+    "macos": {
+      "version": "2.0.0",
+      "buildNumber": "1",
+      "bundleIdentifier": "dev.kadi.github-tracker",
+      "infoPlist": {
+        "CFBundleName": "GitHub Tracker"
+      }
+    }
+  },
+  "projectId": "11d70c57-b739-47cf-b00b-a1a6e08832cf",
+  "updates": {
+    "feedURL": "https://github.com/kadikraman/github-tracker/releases/latest/download/appcast.xml",
+    "publicKey": "TYNwPKSUrJiGUyda0G3QyV+oKLUI16ZTPj1QQzRjHFs="
+  }
+}

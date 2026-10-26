@@ -10,12 +10,7 @@ import {
 import { fetchViewer } from '../api/github';
 import { useTheme } from '../hooks/useTheme';
 import { useToken } from '../hooks/useToken';
-import {
-  checkForUpdates,
-  getCurrentVersion,
-  installAndRelaunch,
-  useUpdateStatus,
-} from '../lib/updateStatus';
+import { checkForUpdates, useUpdateStatus } from '../lib/updateStatus';
 import { appBadgeColor } from '../theme';
 
 export function SettingsScreen({ onDone }: { onDone?: () => void }) {
@@ -134,13 +129,18 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
 function UpdatesCard() {
   const { colors } = useTheme();
   const update = useUpdateStatus();
-  const { version, build } = getCurrentVersion();
 
   const statusLabel = {
+    loading: null,
+    unavailable:
+      update.reason === 'development' || update.reason === 'go'
+        ? 'Updates only run in release builds.'
+        : 'Updates are not configured for this build.',
     idle: null,
     checking: 'Checking for updates…',
+    available: `Update${update.version ? ` ${update.version}` : ''} is available.`,
     downloading: `Downloading update${update.version ? ` ${update.version}` : ''}…`,
-    ready: `Update${update.version ? ` ${update.version}` : ''} is ready.`,
+    downloaded: `Update${update.version ? ` ${update.version}` : ''} is ready.`,
     installing: 'Installing update…',
     upToDate: 'The app is up to date.',
     error: update.message ?? 'The update check failed.',
@@ -148,29 +148,33 @@ function UpdatesCard() {
   const statusColor =
     update.phase === 'error'
       ? colors.danger
-      : update.phase === 'ready' || update.phase === 'upToDate'
+      : update.phase === 'downloaded' || update.phase === 'upToDate'
         ? colors.success
         : colors.muted;
-  const busy =
-    update.phase === 'checking' || update.phase === 'downloading' || update.phase === 'installing';
+  const disabled =
+    update.phase === 'loading' ||
+    update.phase === 'unavailable' ||
+    update.phase === 'checking' ||
+    update.phase === 'downloading' ||
+    update.phase === 'installing';
 
   return (
     <View style={[styles.card, styles.updatesCard, { backgroundColor: colors.card }, colors.shadow]}>
       <Text style={[styles.label, { color: colors.muted }]}>Updates</Text>
-      <Text style={[styles.helpText, { color: colors.muted }]}>
-        GitHub Tracker {version} (build {build})
-      </Text>
+      {update.appVersion ? (
+        <Text style={[styles.helpText, { color: colors.muted }]}>
+          GitHub Tracker {update.appVersion}
+        </Text>
+      ) : null}
       {statusLabel ? (
         <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
       ) : null}
       <Pressable
-        onPress={() => (update.phase === 'ready' ? installAndRelaunch() : checkForUpdates())}
-        disabled={busy}
-        style={[styles.clearButton, { backgroundColor: colors.sunken, opacity: busy ? 0.5 : 1 }]}
+        onPress={() => checkForUpdates()}
+        disabled={disabled}
+        style={[styles.clearButton, { backgroundColor: colors.sunken, opacity: disabled ? 0.5 : 1 }]}
       >
-        <Text style={[styles.clearButtonText, { color: colors.text }]}>
-          {update.phase === 'ready' ? 'Restart to update' : 'Check for updates'}
-        </Text>
+        <Text style={[styles.clearButtonText, { color: colors.text }]}>Check for updates</Text>
       </Pressable>
     </View>
   );

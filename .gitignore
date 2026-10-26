@@ -42,3 +42,11 @@ yarn-error.*
 
 # expo-desktop child process debug logs
 expo-desktop-spawn-debug*.log
+
+# Spark (generated native projects and state)
+.threaded-runtime/
+.spark/*
+!.spark/version
+/macos/
+/windows/
+app.json

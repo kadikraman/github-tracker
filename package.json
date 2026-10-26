@@ -1,41 +1,111 @@
 {
   "name": "githubtracker",
   "version": "1.0.0",
+  "private": true,
   "main": "index.ts",
   "scripts": {
-    "start": "expo start",
-    "macos": "rnc-cli run-macos"
+    "start": "spark dev",
+    "macos": "spark dev",
+    "dev": "spark dev",
+    "build": "spark build",
+    "package": "spark package",
+    "doctor": "spark doctor",
+    "postinstall": "node node_modules/@legendapp/spark/init-template.cjs"
   },
   "dependencies": {
+    "@legendapp/spark": "0.0.1",
+    "@react-native-community/cli": "20.1.3",
+    "@react-native-runtimes/core": "file:./spark-packages/react-native-runtimes-core-3a04e0455ac44b0bc11cfa315943ad84509c445111a2b3974ca85c8ed489827c.tgz",
     "@tanstack/react-query": "^5.101.2",
-    "expo": "~54.0.34",
-    "expo-desktop-modules-core": "^54.0.0",
-    "expo-desktop-prebuild-config": "^1.0.0",
-    "expo-desktop-stubs": "^54.0.0",
-    "expo-file-system": "~19.0.23",
-    "expo-status-bar": "~3.0.9",
+    "@types/react": "19.1.10",
+    "expo": "54.0.37",
+    "expo-desktop": "1.0.6",
+    "expo-desktop-config-plugins": "1.3.2",
+    "expo-desktop-metro-config": "54.81.3",
+    "expo-desktop-prebuild-config": "1.1.3",
+    "expo-desktop-template-bare-minimum": "54.81.6",
+    "expo-file-system": "19.0.24",
     "react": "19.1.4",
+    "react-dom": "19.1.4",
     "react-native": "0.81.6",
-    "react-native-macos": "0.81.8"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.0",
-    "typescript": "~5.9.2",
-    "@react-native-community/cli": "latest",
-    "@rnx-kit/metro-config": "latest",
-    "@react-native/metro-config": "~0.81"
-  },
-  "private": true,
-  "overrides": {
-    "react": "19.1.4",
-    "react-native": "0.81.6"
+    "react-native-macos": "0.81.7",
+    "typescript": "5.9.3"
   },
   "expo": {
     "install": {
       "exclude": [
         "react",
+        "react-dom",
         "react-native"
       ]
+    },
+    "autolinking": {
+      "exclude": []
     }
+  },
+  "allowScripts": {
+    "@legendapp/spark": true,
+    "react-native-enriched-markdown": true,
+    "fsevents": true,
+    "0.0.1": true
+  },
+  "trustedDependencies": [
+    "@legendapp/spark",
+    "react-native-enriched-markdown",
+    "fsevents"
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@legendapp/spark",
+      "react-native-enriched-markdown",
+      "fsevents"
+    ]
+  },
+  "overrides": {
+    "expo": "54.0.37",
+    "@expo/cli": "54.0.27",
+    "react-native-nitro-modules": "file:./spark-packages/react-native-nitro-modules-5df8774796c48ed54d238f3fada01b64d710b14077983c37f639607eb805e066.tgz",
+    "react-native-webview": "file:./spark-packages/react-native-webview-333e421ad38b0da2b1dc7b3306de019f257e31bfd6cdb0272d97b1bb2b129354.tgz",
+    "@op-engineering/op-sqlite": "file:./spark-packages/op-engineering-op-sqlite-a14b99ecf4911b55f586b2c5d1f58ac48b0a9d8fe4b84fa6edef1a167630646b.tgz",
+    "expo-asset": "12.0.13",
+    "expo-constants": "18.0.14",
+    "expo-file-system": "19.0.24",
+    "expo-font": "14.0.12",
+    "expo-keep-awake": "15.0.8",
+    "expo-modules-core": "3.0.30",
+    "expo-desktop-modules-core": "54.0.14",
+    "expo-desktop-stubs": "54.0.15",
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "react-native-macos": "0.81.7",
+    "react-native-windows": "0.81.35",
+    "postcss": "8.5.31",
+    "dompurify": "3.4.17",
+    "@tiptap/core": "3.32.0",
+    "@tiptap/extension-blockquote": "3.32.0",
+    "@tiptap/extension-bold": "3.32.0",
+    "@tiptap/extension-code": "3.32.0",
+    "@tiptap/extension-document": "3.32.0",
+    "@tiptap/extension-heading": "3.32.0",
+    "@tiptap/extension-history": "3.32.0",
+    "@tiptap/extension-image": "3.32.0",
+    "@tiptap/extension-italic": "3.32.0",
+    "@tiptap/extension-link": "3.32.0",
+    "@tiptap/extension-list": "3.32.0",
+    "@tiptap/extension-paragraph": "3.32.0",
+    "@tiptap/extension-strike": "3.32.0",
+    "@tiptap/extension-text": "3.32.0",
+    "@tiptap/extension-text-align": "3.32.0",
+    "@tiptap/extension-underline": "3.32.0",
+    "@tiptap/extensions": "3.32.0",
+    "@tiptap/pm": "3.32.0",
+    "@tiptap/react": "3.32.0",
+    "@tiptap/extension-bubble-menu": "3.32.0",
+    "@tiptap/extension-floating-menu": "3.32.0",
+    "fast-xml-parser": "5.11.2",
+    "react-dom": "19.1.4",
+    "@react-native-runtimes/core": "file:./spark-packages/react-native-runtimes-core-3a04e0455ac44b0bc11cfa315943ad84509c445111a2b3974ca85c8ed489827c.tgz",
+    "expo-audio": "file:./spark-packages/expo-audio-aff5604f2c4cab23299a71e37e802a572b2e66e2e2250b20a261e664d5346693.tgz",
+    "@legendapp/spark": "0.0.1"
   }
 }

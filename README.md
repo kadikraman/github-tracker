@@ -1,6 +1,6 @@
 # GitHub Tracker
 
-A personal macOS menu-style dashboard for the GitHub things you need to action, built with [Expo](https://expo.dev) + [react-native-macos](https://github.com/microsoft/react-native-macos) via the expo-desktop toolchain.
+A personal macOS menu-style dashboard for the GitHub things you need to action, built with [Legend Spark](https://legend.so/spark/) on [Expo](https://expo.dev) + [react-native-macos](https://github.com/microsoft/react-native-macos).
 
 <img width="1178" height="798" alt="Screenshot 2026-07-23 at 13 42 01" src="https://github.com/user-attachments/assets/389e6062-ab7f-4b60-a046-f132691840e8" />
 
@@ -21,13 +21,12 @@ The theme toggle in the toolbar offers **light / dark / follow-system**, and the
 
 ## Getting started
 
-Prerequisites: [bun](https://bun.sh), Xcode (with macOS SDK), CocoaPods.
+Prerequisites: [bun](https://bun.sh), Node 24.19 or later, Xcode (with the macOS SDK), CocoaPods, macOS 14+ on Apple Silicon.
 
 ```sh
 bun install
-cd macos && RCT_NEW_ARCH_ENABLED=1 pod install && cd ..
-bun start          # Metro dev server
-bun run macos      # build + launch the app
+npx --no-install spark build --dev   # once, and after native config changes
+bun run macos                        # Spark dev session: Metro + the dev build
 ```
 
 On first launch the app asks for a **GitHub Personal Access Token**:
@@ -36,31 +35,21 @@ On first launch the app asks for a **GitHub Personal Access Token**:
 2. If you need results from SSO-protected organizations, open the token's **Configure SSO** menu and authorize it for each org — otherwise those items silently won't appear in search results.
 3. Paste it into the app's Settings screen and hit Save (the app validates it against `GET /user` before storing).
 
-Builds are signed with an Apple Development certificate (`DEVELOPMENT_TEAM` is set in the Xcode project). Signing into Xcode (Settings → Accounts) is necessary but not sufficient on a fresh machine: `bun run macos` invokes `xcodebuild` *without* `-allowProvisioningUpdates`, so it can't mint a certificate and fails with `No signing certificate "Mac Development" found`. Run one build with the flag to get the certificate into your keychain:
-
-```sh
-cd macos && xcodebuild -workspace GitHubTracker.xcworkspace -scheme GitHubTracker-macOS -configuration Debug -allowProvisioningUpdates build
-```
-
-After that, `bun run macos` works on its own.
-
-### Fresh-clone troubleshooting
-
-- `Unable to open base configuration reference file '.../Pods-GitHubTracker-macOS.debug.xcconfig'` — the `macos/Pods` directory is generated, not committed. Run `pod install` in `macos/`.
-- `No signing certificate "Mac Development" found` — no development certificate in the keychain yet; see the `-allowProvisioningUpdates` command above. Verify with `security find-identity -v -p codesigning`.
+To try a standalone release build locally: `bun run build`, then `npx --no-install spark open`. `bun run package` signs it with your Developer ID, notarizes it and writes the archive to `dist/`; the first run asks for the signing certificate and a notarytool profile.
 
 ## Token storage & security
 
-- The token is stored in the **macOS Keychain** (a generic-password item, service `dev.kadi.github-tracker`), via a small local Expo native module — see `modules/keychain/`. It is never written to disk in plaintext.
-- Earlier versions kept the token in a plain `settings.json`; on first launch after upgrading, the app migrates it into the Keychain and scrubs the file. Only non-secrets (theme choice, hidden item IDs) live in `settings.json` inside the app's sandboxed container.
-- Because builds share a stable signing identity, the Keychain access prompt appears once — "Always Allow" persists across rebuilds.
+- The token is stored in the **macOS Keychain** through Spark's secure storage (`@legendapp/spark/secure-storage`). It is never written to disk in plaintext.
+- Version 2.0 moved to Spark, so a token saved by 1.x is not read: enter it once again. Only non-secrets (theme choice, hidden item IDs) live in `settings.json`, in `~/Library/Application Support/dev.kadi.github-tracker`.
 - The app is read-only in practice (only `GET` requests to `api.github.com` over HTTPS), but a classic `repo`-scope token itself grants write access — treat it accordingly, and revoke it in GitHub settings if you ever suspect exposure.
 
 ## Project layout
 
 ```
 App.tsx                     Providers (query client, theme, token, hidden) + screen switcher
-index.ts                    Entry point (registerRootComponent)
+index.ts                    Entry point: registers the main and popover roots, starts the menu bar item
+desktop.config.json         Spark app config: identity, window, entitlements, updates feed
+spark-packages/             Spark's vendored release packages (committed)
 src/
   api/
     github.ts               GitHub REST client: search queries per section, error types, token validation
@@ -71,21 +60,19 @@ src/
     icons.tsx               Hand-drawn View/Text-based icons (no SVG dependency)
   hooks/
     useTrackedItems.ts      react-query wrapper: polling, focus refetch, caching per section
-    useToken.tsx            Token context, backed by the Keychain
+    useToken.tsx            Token context, backed by Spark secure storage
     useHidden.tsx           Hidden-items context, persisted to settings.json
     useTheme.tsx            Light/dark/system theme context; syncs native window appearance
+  lib/
+    menuBar.ts              Menu bar item and popover window
+    updateStatus.ts         Sparkle update status via @legendapp/spark/updates
   screens/
     TrackerScreen.tsx       Toolbar, summary cards, scrollable section list
-    SettingsScreen.tsx      Token entry/validation, help text
+    SettingsScreen.tsx      Token entry/validation, updates
+    MenuBarApp.tsx          Popover content
   storage/
-    settings.ts             Sandboxed settings.json read/write (non-secrets only)
-    tokenStore.ts           Keychain-backed token load/save + legacy migration
-  lib/                      Small utilities (focus manager wiring, relative time)
-  theme.ts                  Light/dark palettes and design tokens
-modules/
-  keychain/                 Local Expo native module (Swift) wrapping Security.framework
-macos/                      Xcode project, Podfile, app icon asset catalog (Pods/ is generated by pod install)
-assets/                     App icon source images
+    dataDirectory.ts        ~/Library/Application Support/dev.kadi.github-tracker
+    settings.ts             settings.json read/write (non-secrets only)
+    itemsCache.ts           Per-section item cache for fast cold starts
+    tokenStore.ts           Secure-storage token load/save
 ```
-
-The visual design lives in a Claude Design project (`GitHub Tracker.dc.html` / `App Icon.dc.html`) and the UI follows it: system font, per-section accent colors, card-based layout with light and dark token sets.

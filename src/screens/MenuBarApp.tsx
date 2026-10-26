@@ -1,20 +1,21 @@
+import { GlassView, getGlassAvailability } from '@legendapp/spark/ui/glass';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import MenuBar from '../../modules/menubar';
 import type { SectionKey } from '../api/github';
 import type { TrackedItem } from '../api/types';
 import { repoFullName } from '../components/ItemRow';
 import { OfflineBanner } from '../components/OfflineBanner';
-import { UpdateBanner } from '../components/UpdateBanner';
 import { HiddenProvider, useHidden } from '../hooks/useHidden';
 import { ThemeProvider, useTheme } from '../hooks/useTheme';
 import { TokenProvider, useToken } from '../hooks/useToken';
 import { useTrackedItems } from '../hooks/useTrackedItems';
+import { closePopover, openMainWindow } from '../lib/menuBar';
 import { queryClient } from '../lib/queryClient';
 import { alpha, type Palette } from '../theme';
 
 const TOP_N = 3;
+const hasGlass = getGlassAvailability().available;
 
 const SECTIONS: { key: SectionKey; title: string; accentKey: keyof Palette }[] = [
   { key: 'review', title: 'Review requested', accentKey: 'review' },
@@ -30,7 +31,7 @@ function CompactRow({ item, accent }: { item: TrackedItem; accent: string }) {
     <Pressable
       onPress={() => {
         Linking.openURL(item.html_url);
-        MenuBar.closePopover();
+        closePopover();
       }}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
@@ -106,7 +107,7 @@ function OpenAppFooter() {
   const [hovered, setHovered] = useState(false);
   return (
     <Pressable
-      onPress={() => MenuBar.openMainWindow()}
+      onPress={openMainWindow}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
       style={[
@@ -121,15 +122,19 @@ function OpenAppFooter() {
 
 function PopoverContent() {
   const { colors } = useTheme();
-  const { token } = useToken();
+  const { token, loaded } = useToken();
 
-  // Transparent root: the native panel provides a glass/vibrancy background.
+  // The popover window is transparent: glass draws its background on macOS 26+,
+  // and older systems get the opaque window colour.
   return (
-    <View style={styles.container}>
-      {token ? (
+    <GlassView
+      style={[styles.container, !hasGlass && { backgroundColor: colors.appBg }]}
+    >
+      {!loaded ? (
+        <View style={styles.noToken} />
+      ) : token ? (
         <>
           <OfflineBanner />
-          <UpdateBanner />
           <ScrollView contentContainerStyle={styles.scrollContent}>
             {SECTIONS.map((section) => (
               <MenuBarSection
@@ -149,7 +154,7 @@ function PopoverContent() {
         </View>
       )}
       <OpenAppFooter />
-    </View>
+    </GlassView>
   );
 }
 
@@ -170,6 +175,8 @@ export function MenuBarApp() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   scrollContent: {
     paddingVertical: 10,

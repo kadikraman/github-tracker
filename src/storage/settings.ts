@@ -1,14 +1,12 @@
-import { File, Paths } from 'expo-file-system';
+import { File } from 'expo-file-system';
+import { dataDirectory } from './dataDirectory';
 
 export type Settings = {
-  /** Legacy: tokens now live in the Keychain (see tokenStore.ts); this field
-      only exists so old files can be migrated and scrubbed. */
-  token?: string;
   hidden?: Record<string, number[]>;
   themeMode?: 'light' | 'dark' | 'system';
 };
 
-const settingsFile = new File(Paths.document, 'settings.json');
+const settingsFile = new File(dataDirectory, 'settings.json');
 
 export function loadSettings(): Settings {
   try {
