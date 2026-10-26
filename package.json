@@ -46,8 +46,7 @@
   "allowScripts": {
     "@legendapp/spark": true,
     "react-native-enriched-markdown": true,
-    "fsevents": true,
-    "0.0.1": true
+    "fsevents": true
   },
   "trustedDependencies": [
     "@legendapp/spark",
