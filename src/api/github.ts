@@ -1,4 +1,10 @@
-import type { GitHubSearchResponse, GitHubViewer, TrackedItem } from './types';
+import type {
+  GitHubSearchResponse,
+  GitHubViewer,
+  PullRequestReviews,
+  ReviewState,
+  TrackedItem,
+} from './types';
 
 const BASE_URL = 'https://api.github.com';
 
@@ -22,8 +28,9 @@ export class GitHubApiError extends Error {
   }
 }
 
-async function request<T>(token: string, path: string): Promise<T> {
+async function request<T>(token: string, path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
+    ...init,
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
@@ -53,7 +60,58 @@ export async function searchItems(token: string, query: string): Promise<Tracked
     'advanced_search=true',
   ].join('&');
   const data = await request<GitHubSearchResponse>(token, `/search/issues?${params}`);
-  return data.items;
+  return withReviewStates(token, data.items);
+}
+
+const REVIEWS_QUERY = `query ($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest {
+      id
+      reviewDecision
+      latestOpinionatedReviews(first: 50) { nodes { state } }
+    }
+  }
+}`;
+
+function reviewState(pr: PullRequestReviews): ReviewState | undefined {
+  switch (pr.reviewDecision) {
+    case 'APPROVED':
+      return 'approved';
+    case 'CHANGES_REQUESTED':
+      return 'changes_requested';
+    case 'REVIEW_REQUIRED':
+      return 'review_required';
+  }
+  // reviewDecision is null when the repo requires no reviews, even after one.
+  const states = pr.latestOpinionatedReviews.nodes.map((review) => review.state);
+  if (states.includes('CHANGES_REQUESTED')) return 'changes_requested';
+  if (states.includes('APPROVED')) return 'approved';
+  return undefined;
+}
+
+// Search results carry no review state, so it comes from one GraphQL lookup.
+// A failed lookup leaves the items without it rather than failing the section.
+async function withReviewStates(token: string, items: TrackedItem[]): Promise<TrackedItem[]> {
+  const ids = items.filter((item) => item.pull_request != null).map((item) => item.node_id);
+  if (ids.length === 0) {
+    return items;
+  }
+  try {
+    const { data } = await request<{ data?: { nodes: (PullRequestReviews | null)[] } }>(
+      token,
+      '/graphql',
+      { method: 'POST', body: JSON.stringify({ query: REVIEWS_QUERY, variables: { ids } }) }
+    );
+    const states = new Map<string, ReviewState | undefined>();
+    for (const node of data?.nodes ?? []) {
+      if (node?.id != null) {
+        states.set(node.id, reviewState(node));
+      }
+    }
+    return items.map((item) => ({ ...item, review_state: states.get(item.node_id) }));
+  } catch {
+    return items;
+  }
 }
 
 export async function fetchViewer(token: string): Promise<GitHubViewer> {

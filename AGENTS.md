@@ -40,6 +40,7 @@ Both trees run in the same JS runtime and bridge. Consequences:
 ## Data layer
 
 - `src/api/github.ts`: fetch-based client, `GET /search/issues` with four queries (`SECTION_QUERIES`: review, mentioned, issues, authored) and `GET /user`. HTTP errors throw `GitHubApiError` (has `status`, `rateLimited`); raw connectivity failures surface as fetch `TypeError`.
+- Search results have no review state, so `searchItems` adds `review_state` to each PR from one GraphQL `nodes` lookup. It uses `reviewDecision`, and falls back to the latest approve or change-request reviews when that is null (repos that require no review). A failed lookup leaves the items without `review_state`; it does not fail the section. `src/lib/reviewState.ts` maps it to a label and colour for both surfaces.
 - `src/hooks/useTrackedItems.ts`: React Query v5, `queryKey: ['items', key]`, 60s `refetchInterval`, 30s `staleTime`, `retry: 1`, seeded from the disk cache via `initialData`.
 - `TrackedItem` (`src/api/types.ts`) is plain JSON; `pull_request == null` means the item is an issue.
 

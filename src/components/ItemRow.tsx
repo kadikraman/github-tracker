@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { TrackedItem } from '../api/types';
+import type { ReviewState, TrackedItem } from '../api/types';
 import { useTheme } from '../hooks/useTheme';
+import { reviewStateDisplay } from '../lib/reviewState';
 import { timeAgo } from '../lib/timeAgo';
 import { alpha } from '../theme';
 import { EyeIcon, EyeOffIcon, IssueIcon, PullRequestIcon } from './icons';
@@ -9,6 +10,17 @@ import { EyeIcon, EyeOffIcon, IssueIcon, PullRequestIcon } from './icons';
 export function repoFullName(repositoryUrl: string): string {
   const [, fullName] = repositoryUrl.split('/repos/');
   return fullName ?? repositoryUrl;
+}
+
+function ReviewTag({ state }: { state: ReviewState }) {
+  const { colors } = useTheme();
+  const { label, color } = reviewStateDisplay(state, colors);
+  const background = state === 'review_required' ? colors.sunken : alpha(color, 0.14);
+  return (
+    <View style={[styles.tag, { backgroundColor: background }]}>
+      <Text style={[styles.tagText, { color }]}>{label.toUpperCase()}</Text>
+    </View>
+  );
 }
 
 type ItemRowProps = {
@@ -46,10 +58,11 @@ export function ItemRow({ item, accent, isLast, onHide }: ItemRowProps) {
         <View style={styles.titleLine}>
           <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
           {item.draft ? (
-            <View style={[styles.draftTag, { backgroundColor: colors.sunken }]}>
-              <Text style={[styles.draftTagText, { color: colors.muted }]}>DRAFT</Text>
+            <View style={[styles.tag, { backgroundColor: colors.sunken }]}>
+              <Text style={[styles.tagText, { color: colors.muted }]}>DRAFT</Text>
             </View>
           ) : null}
+          {item.review_state ? <ReviewTag state={item.review_state} /> : null}
         </View>
         <Text style={[styles.meta, { color: colors.muted }]} numberOfLines={1}>
           {repoFullName(item.repository_url)}{' '}
@@ -134,12 +147,12 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     flexShrink: 1,
   },
-  draftTag: {
+  tag: {
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  draftTagText: {
+  tagText: {
     fontSize: 10.5,
     fontWeight: '600',
     letterSpacing: 0.42,

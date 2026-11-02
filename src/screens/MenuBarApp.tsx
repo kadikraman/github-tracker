@@ -12,6 +12,7 @@ import { TokenProvider, useToken } from '../hooks/useToken';
 import { useTrackedItems } from '../hooks/useTrackedItems';
 import { closePopover, openMainWindow } from '../lib/menuBar';
 import { queryClient } from '../lib/queryClient';
+import { reviewStateDisplay } from '../lib/reviewState';
 import { alpha, type Palette } from '../theme';
 
 const TOP_N = 3;
@@ -27,6 +28,7 @@ const SECTIONS: { key: SectionKey; title: string; accentKey: keyof Palette }[] =
 function CompactRow({ item, accent }: { item: TrackedItem; accent: string }) {
   const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
+  const review = item.review_state ? reviewStateDisplay(item.review_state, colors) : null;
   return (
     <Pressable
       onPress={() => {
@@ -44,6 +46,7 @@ function CompactRow({ item, accent }: { item: TrackedItem; accent: string }) {
         </Text>
         <Text numberOfLines={1} style={[styles.rowMeta, { color: colors.muted }]}>
           {repoFullName(item.repository_url)} #{item.number}
+          {review ? <Text style={{ color: review.color }}> · {review.label}</Text> : null}
         </Text>
       </View>
     </Pressable>
