@@ -114,25 +114,44 @@ jobs:
       # Builds the release app, signs it with Developer ID, notarizes, staples
       # and verifies it, then signs the update archive and appcast into
       # dist/updates and checks the signature against updates.publicKey. It
-      # exits 2 while Apple is still processing; rerunning resumes the same
-      # submission.
+      # exits 2 while Apple is still processing. Rerunning resumes from saved
+      # state without a second submission, so a network failure (such as the
+      # staple after notarization) is retried too.
       - name: Build, sign and notarize
         env:
           SPARK_DEVELOPER_ID_APPLICATION: 'Developer ID Application: Kadi Kraman (XQAX5LF48P)'
           SPARK_TEAM_ID: XQAX5LF48P
           SPARK_NOTARY_KEYCHAIN_PROFILE: github-tracker-notary
         run: |
+          OUTPUT="$RUNNER_TEMP/spark-package.log"
           for attempt in $(seq 1 15); do
-            status=0
-            npx --no-install spark package < /dev/null || status=$?
-            if [ "$status" -ne 2 ]; then
+            set +e
+            npx --no-install spark package < /dev/null 2>&1 | tee "$OUTPUT"
+            status=${PIPESTATUS[0]}
+            set -e
+            if [ "$status" -eq 0 ]; then
+              exit 0
+            elif [ "$status" -eq 2 ]; then
+              echo "Notarization still in progress; retrying in 60s (attempt $attempt)"
+            elif grep -q "Next: Check your internet connection" "$OUTPUT"; then
+              echo "Network failure; retrying in 60s (attempt $attempt)"
+            else
               exit "$status"
             fi
-            echo "Notarization still in progress; retrying in 60s (attempt $attempt)"
             sleep 60
           done
-          echo "::error::Notarization did not finish in time"
+          echo "::error::spark package did not finish after 15 attempts"
           exit 1
+
+      - name: Show the Spark error log
+        if: failure()
+        run: |
+          for log in .spark/logs/*-error.log; do
+            if [ -f "$log" ]; then
+              echo "== $log"
+              cat "$log"
+            fi
+          done
 
       - name: Remove the Sparkle key file
         if: always()
