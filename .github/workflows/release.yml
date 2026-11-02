@@ -70,35 +70,52 @@ jobs:
           rm "$KEY_FILE"
           echo "SPARK_SIGNING_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
-      # spark package signs the update feed with the Sparkle key stored in the
-      # Keychain under spark.<projectId>. Sparkle's generate_keys imports it.
-      - name: Import Sparkle update key
+      # spark package passes Sparkle's tools --account spark.<projectId>, which
+      # reads the key from the Keychain. On CI that read waits for an access
+      # prompt nobody can answer, and sign_update hangs until the job times out.
+      # So the tools at the path spark package reuses are wrappers that drop
+      # --account and sign with the key file instead.
+      - name: Sign updates with a key file
         env:
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
         run: |
-          # Same checksum-pinned tools spark package downloads, at the path it reuses.
-          TOOLS=~/.spark/tools/sparkle-2.9.6
-          curl -fsSL -o "$RUNNER_TEMP/sparkle.tar.xz" \
-            https://github.com/sparkle-project/Sparkle/releases/download/2.9.6/Sparkle-2.9.6.tar.xz
-          echo "52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192  $RUNNER_TEMP/sparkle.tar.xz" | shasum -a 256 -c
-          mkdir -p "$TOOLS"
-          tar -xJf "$RUNNER_TEMP/sparkle.tar.xz" -C "$TOOLS"
+          SPARKLE_VERSION=2.9.6
+          # A Spark upgrade that moves to another Sparkle would skip the wrappers.
+          grep -q "SPARKLE_VERSION = \"$SPARKLE_VERSION\"" \
+            node_modules/@legendapp/spark/vendor/node_modules/@legendapp/spark-cli/dist/updates.js \
+            || { echo "::error::Spark no longer uses Sparkle $SPARKLE_VERSION; update this step"; exit 1; }
 
-          PROJECT_ID="$(jq -r .projectId desktop.config.json)"
+          # The same checksum-pinned tools spark package downloads.
+          REAL="$RUNNER_TEMP/sparkle"
+          curl -fsSL -o "$RUNNER_TEMP/sparkle.tar.xz" \
+            "https://github.com/sparkle-project/Sparkle/releases/download/$SPARKLE_VERSION/Sparkle-$SPARKLE_VERSION.tar.xz"
+          echo "52bf9e88cdd972fc0c81501377a880e90d47031bd8ca5462488f843e2609e192  $RUNNER_TEMP/sparkle.tar.xz" | shasum -a 256 -c
+          mkdir -p "$REAL"
+          tar -xJf "$RUNNER_TEMP/sparkle.tar.xz" -C "$REAL"
+
           KEY_FILE="$RUNNER_TEMP/sparkle.key"
-          echo -n "$SPARKLE_ED_PRIVATE_KEY" > "$KEY_FILE"
-          "$TOOLS/bin/generate_keys" --account "spark.$PROJECT_ID" -f "$KEY_FILE"
-          rm "$KEY_FILE"
-          PUBLIC_KEY="$("$TOOLS/bin/generate_keys" --account "spark.$PROJECT_ID" -p)"
-          if [ "$PUBLIC_KEY" != "$(jq -r .updates.publicKey desktop.config.json)" ]; then
-            echo "::error::SPARKLE_ED_PRIVATE_KEY does not match updates.publicKey in desktop.config.json"
-            exit 1
-          fi
+          (umask 077 && echo -n "$SPARKLE_ED_PRIVATE_KEY" > "$KEY_FILE")
+
+          BIN=~/.spark/tools/sparkle-$SPARKLE_VERSION/bin
+          mkdir -p "$BIN"
+          for tool in sign_update generate_appcast; do
+            cat > "$BIN/$tool" <<EOF
+          #!/bin/bash
+          args=()
+          while [ \$# -gt 0 ]; do
+            if [ "\$1" = --account ]; then shift 2; continue; fi
+            args+=("\$1"); shift
+          done
+          exec "$REAL/bin/$tool" --ed-key-file "$KEY_FILE" "\${args[@]}"
+          EOF
+            chmod +x "$BIN/$tool"
+          done
 
       # Builds the release app, signs it with Developer ID, notarizes, staples
       # and verifies it, then signs the update archive and appcast into
-      # dist/updates. It exits 2 while Apple is still processing; rerunning
-      # resumes the same submission.
+      # dist/updates and checks the signature against updates.publicKey. It
+      # exits 2 while Apple is still processing; rerunning resumes the same
+      # submission.
       - name: Build, sign and notarize
         env:
           SPARK_DEVELOPER_ID_APPLICATION: 'Developer ID Application: Kadi Kraman (XQAX5LF48P)'
@@ -116,6 +133,10 @@ jobs:
           done
           echo "::error::Notarization did not finish in time"
           exit 1
+
+      - name: Remove the Sparkle key file
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sparkle.key"
 
       # Installed apps read the feed at releases/latest/download/appcast.xml,
       # and the appcast points at the archive next to it in the same release.

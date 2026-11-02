@@ -63,7 +63,8 @@ Small synchronous JSON files via the expo-file-system `File` API, read once at m
 
 - `@legendapp/spark/updates` (Sparkle 2.9.6, Sparkle's own windows). `src/lib/updateStatus.ts` turns on automatic checks at module load and keeps module-scope status for both roots; Settings shows the version and **Check for updates**. Dev builds report updates as unavailable.
 - Feed and public key are `updates` in `desktop.config.json`. The private key is in the login Keychain under `spark.<projectId>` (made by `spark updates init`) and in the `SPARKLE_ED_PRIVATE_KEY` secret for CI. Export it with Sparkle's `generate_keys --account spark.<projectId> -x <file>`.
-- `.github/workflows/release.yml` runs on a `v*` tag: sets `version` from the tag and `macos.buildNumber` from `GITHUB_RUN_NUMBER` (must keep increasing), imports the Developer ID cert and a notarytool profile into a temporary keychain, imports the Sparkle key, then loops `spark package` (exit 2 means notarization is pending) and uploads `dist/updates/*.zip` and `appcast.xml`.
+- `.github/workflows/release.yml` runs on a `v*` tag: sets `version` from the tag and `macos.buildNumber` from `GITHUB_RUN_NUMBER` (must keep increasing), imports the Developer ID cert and a notarytool profile into a temporary keychain, then loops `spark package` (exit 2 means notarization is pending) and uploads `dist/updates/*.zip` and `appcast.xml`.
+- CI never puts the Sparkle key in a Keychain: `sign_update` hung there on an access prompt nobody can answer. The workflow replaces `sign_update` and `generate_appcast` under `~/.spark/tools/sparkle-<version>/bin`, the path `spark package` reuses, with wrappers that drop Spark's `--account` and pass `--ed-key-file`. It fails if Spark moves to another Sparkle version.
 - Installed apps read `releases/latest/download/appcast.xml`; the appcast points at the archive in the same release.
 
 ## UI conventions
