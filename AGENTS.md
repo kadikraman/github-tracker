@@ -35,6 +35,7 @@ Both trees run in the same JS runtime and bridge. Consequences:
 - The popover native window survives a JS reload; `menuBar.ts` finds it with `listWindows()` instead of keeping a flag.
 - The main window hides on close (`macos.lifecycle.mainWindow.closeBehavior: "hide"`), so **Open GitHub Tracker** in the popover can `showWindow('main')` again.
 - Popover glass: `GlassView` from `@legendapp/spark/ui/glass` on macOS 26+, with the window `transparent` and `backgroundColor: '#00000000'`. Older systems get `appBg`.
+- `openWindow` makes a window dark when it gets no `appearance`. The popover passes `appearance: 'system'`, so it follows `NSApp.appearance`, which `Appearance.setColorScheme` in `ThemeProvider` sets; without it the glass stays dark under the light palette.
 - The app is not sandboxed (Spark's default). Entitlements live in `desktop.config.json` under `macos.entitlements`.
 
 ## Data layer

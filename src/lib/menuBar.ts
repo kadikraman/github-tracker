@@ -56,6 +56,10 @@ async function openPopover(): Promise<void> {
       size: { width: WIDTH, height: HEIGHT },
       position,
       titleBarStyle: 'hidden',
+      // Without an appearance Spark makes the window dark, so the glass stayed
+      // dark under the light palette. 'system' follows the app's appearance,
+      // which ThemeProvider sets.
+      appearance: 'system',
       transparent: true,
       backgroundColor: '#00000000',
       hasShadow: true,
