@@ -30,7 +30,7 @@ Both trees run in the same JS runtime and bridge. Consequences:
 
 - There is no committed `macos/` folder. Spark generates the native project from `desktop.config.json` into `macos/` (gitignored, disposable) and owns the AppDelegate. Native settings go in `desktop.config.json`, never in generated files. Keep its `projectId`: it scopes secure storage, the update key account and Spark's single-instance lock.
 - App icon: neither Spark nor Expo Desktop builds a macOS icon set from `expo.icon`. `plugins/withMacosAppIcon.js` (in `expo.plugins`) copies `assets/AppIcon.appiconset` over the generated one; edit the PNGs there.
-- `src/lib/menuBar.ts` owns the tray item (`@legendapp/spark/tray`, SF Symbol `arrow.triangle.pull`) and the popover window. The popover is `kind: 'overlay'` with `titleBarStyle: 'hidden'`: overlay keeps it visible while another app is active, and a titled window can become key, so `focusChanged false` hides it on an outside click. A borderless window never becomes key; a `panelStyle` panel hides itself whenever the app is inactive. Evidence: vault plan 005 `prototype.md`.
+- `src/lib/menuBar.ts` owns the tray item (`@legendapp/spark/tray`, SF Symbol `point.3.filled.connected.trianglepath.dotted`) and the popover window. The popover is `kind: 'overlay'` with `titleBarStyle: 'hidden'`: overlay keeps it visible while another app is active, and a titled window can become key, so `focusChanged false` hides it on an outside click. A borderless window never becomes key; a `panelStyle` panel hides itself whenever the app is inactive. Evidence: vault plan 005 `prototype.md`.
 - The tray API gives no status item frame. The popover centres on the cursor at click time.
 - The popover native window survives a JS reload; `menuBar.ts` finds it with `listWindows()` instead of keeping a flag.
 - The main window hides on close (`macos.lifecycle.mainWindow.closeBehavior: "hide"`), so **Open GitHub Tracker** in the popover can `showWindow('main')` again. It calls `activate()` from `@legendapp/spark/app` first: the popover is a non-activating panel, so the app is inactive when it is clicked, and `showWindow` alone orders the main window behind the active app's front window.
@@ -40,8 +40,9 @@ Both trees run in the same JS runtime and bridge. Consequences:
 
 ## Data layer
 
-- `src/api/github.ts`: fetch-based client, `GET /search/issues` with four queries (`SECTION_QUERIES`: review, mentioned, issues, authored) and `GET /user`. HTTP errors throw `GitHubApiError` (has `status`, `rateLimited`); raw connectivity failures surface as fetch `TypeError`.
-- Search results have no review state, so `searchItems` adds `review_state` to each PR from one GraphQL `nodes` lookup. It uses `reviewDecision`, and falls back to the latest approve or change-request reviews when that is null (repos that require no review). A failed lookup leaves the items without `review_state`; it does not fail the section. `src/lib/reviewState.ts` maps it to a label and colour for both surfaces.
+- `src/api/github.ts`: fetch-based client, `GET /search/issues` with five queries (`SECTION_QUERIES`: review, mentioned, issues, authored, reviewed) and `GET /user`. `useViewer` caches the login; it shortens repositories the user owns. HTTP errors throw `GitHubApiError` (has `status`, `rateLimited`); raw connectivity failures surface as fetch `TypeError`.
+- Search results have no review state, so `searchItems` adds `review_state` to each PR from one GraphQL `nodes` lookup. It uses `reviewDecision`, and falls back to the latest approve or change-request reviews when that is null (repos that require no review). The same lookup adds `my_review` (the user's latest review on the PR, from `viewerDidAuthor`), which groups the `reviewed` section. A failed lookup leaves the items without either; it does not fail the section. `src/lib/reviewState.ts` maps `review_state` to a label and colour for both surfaces.
+- `src/lib/groups.ts` splits a section's visible items into named groups (needs review, changes requested, already approved, drafts, and so on). Both surfaces render from these groups: the main window as group headers inside a panel, the popover as open rows plus folded toggles.
 - `src/hooks/useTrackedItems.ts`: React Query v5, `queryKey: ['items', key]`, 60s `refetchInterval`, 30s `staleTime`, `retry: 1`, seeded from the disk cache via `initialData`.
 - `TrackedItem` (`src/api/types.ts`) is plain JSON; `pull_request == null` means the item is an issue.
 
@@ -71,7 +72,9 @@ Small synchronous JSON files via the expo-file-system `File` API, read once at m
 ## UI conventions
 
 - Theme via `useTheme()` + `Palette` in `src/theme.ts`; `alpha(hex, opacity)` for tints. No SVG dependency; icons are hand-built Views in `src/components/icons.tsx`.
-- Main window and popover do not share row/section components (`TrackerSection`/`ItemRow` vs the compact ones inside `MenuBarApp.tsx`). Shared layers are hooks, api, storage, lib, and theme.
+- Main window: a toolbar with filter chips (one chip filters the panels to one group or section, click again to clear), then panels that wrap into columns at 520pt (`Panel` + `ItemRow`, one line per item). Mentioned and Issues show five rows and a "Show all" link. The theme control lives on the Settings screen.
+- Popover: a header with the sync label, four count tiles that open the main window, then sections built from the same groups: open rows, and a folded toggle per secondary group (compact components inside `MenuBarApp.tsx`). It is 380 by 790pt, clamped to the work area.
+- Main window and popover do not share row/section components. Shared layers are hooks (`useAllSections` for every query and the sync label), api, storage, lib, and theme.
 
 <!-- spark:skill:start -->
 From the app root, read [Spark's app development skill](node_modules/@legendapp/spark/skills/spark/SKILL.md) before working on this app.

@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { fetchViewer } from '../api/github';
+import { ThemeSegmentedControl } from '../components/ThemeSegmentedControl';
 import { useTheme } from '../hooks/useTheme';
 import { useToken } from '../hooks/useToken';
 import { checkForUpdates, useUpdateStatus } from '../lib/updateStatus';
@@ -119,6 +120,10 @@ export function SettingsScreen({ onDone }: { onDone?: () => void }) {
               <Text style={[styles.clearButtonText, { color: colors.danger }]}>Clear token</Text>
             </Pressable>
           ) : null}
+        </View>
+        <View style={[styles.card, styles.updatesCard, { backgroundColor: colors.card }, colors.shadow]}>
+          <Text style={[styles.label, { color: colors.muted }]}>Appearance</Text>
+          <ThemeSegmentedControl />
         </View>
         <UpdatesCard />
       </View>
