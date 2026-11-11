@@ -1,3 +1,4 @@
+import { activate } from '@legendapp/spark/app';
 import { createTray } from '@legendapp/spark/tray';
 import {
   addWindowListener,
@@ -105,9 +106,14 @@ export function closePopover(): void {
     .catch(logError);
 }
 
+// The popover is a non-activating panel, so a click in it leaves the app
+// inactive, and showWindow alone then orders the main window behind the
+// active app's front window.
 export function openMainWindow(): void {
   closePopover();
-  showWindow('main', { focus: true }).catch(logError);
+  activate()
+    .then(() => showWindow('main', { focus: true }))
+    .catch(logError);
 }
 
 function logError(error: unknown): void {
