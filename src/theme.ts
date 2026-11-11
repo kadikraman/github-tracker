@@ -15,6 +15,7 @@ export type Palette = {
   review: string;
   mentioned: string;
   prs: string;
+  reviewed: string;
   issues: string;
   danger: string;
   success: string;
@@ -27,22 +28,23 @@ export type Palette = {
 };
 
 export const lightPalette: Palette = {
-  appBg: '#f4f5f8',
+  appBg: '#f4f5f7',
   card: '#ffffff',
-  cardHover: '#f6f7f9',
-  sunken: 'rgba(20, 22, 28, 0.06)',
-  text: '#1a1d23',
-  muted: '#656c77',
-  faint: '#979ea9',
-  border: 'rgba(20, 22, 28, 0.09)',
-  sep: 'rgba(20, 22, 28, 0.07)',
-  titlebar: '#fbfcfd',
-  review: '#7c5cff',
-  mentioned: '#e0850a',
-  prs: '#12a150',
-  issues: '#2f74e0',
-  danger: '#e5484d',
-  success: '#12a150',
+  cardHover: '#f6f8fa',
+  sunken: 'rgba(20, 22, 28, 0.05)',
+  text: '#1f2328',
+  muted: '#59636e',
+  faint: '#8c959f',
+  border: '#e3e6ea',
+  sep: '#f0f1f3',
+  titlebar: '#ffffff',
+  review: '#6d5ae6',
+  mentioned: '#c25e00',
+  prs: '#1a7f37',
+  reviewed: '#0e7c86',
+  issues: '#0969da',
+  danger: '#cf222e',
+  success: '#1a7f37',
   shadow: {
     shadowColor: '#14161c',
     shadowOpacity: 0.09,
@@ -65,6 +67,7 @@ export const darkPalette: Palette = {
   review: '#a68bff',
   mentioned: '#f5b13d',
   prs: '#3ad07e',
+  reviewed: '#4cc9d4',
   issues: '#6aa4ff',
   danger: '#ff7076',
   success: '#3ad07e',
@@ -84,6 +87,6 @@ export function alpha(hex: string, opacity: number): string {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-/** App badge — solid blend of the design's #8b6dff → #4d8bff gradient. */
-export const appBadgeColor = '#6c7cff';
+/** App badge in the main window toolbar. */
+export const appBadgeColor = '#6d5ae6';
 

@@ -304,3 +304,36 @@ export function SlidersIcon({ size = 16, color }: IconProps) {
     </View>
   );
 }
+
+/** Two overlapping rounded squares — the "copy" action. */
+export function CopyIcon({ size = 14, color }: IconProps) {
+  const s = size / 24;
+  const stroke = Math.max(1.3, 1.8 * s);
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={abs({
+          left: 3 * s,
+          top: 3 * s,
+          width: 12 * s,
+          height: 12 * s,
+          borderTopWidth: stroke,
+          borderLeftWidth: stroke,
+          borderColor: color,
+          borderTopLeftRadius: 3 * s,
+        })}
+      />
+      <View
+        style={abs({
+          left: 8.5 * s,
+          top: 8.5 * s,
+          width: 12.5 * s,
+          height: 12.5 * s,
+          borderWidth: stroke,
+          borderColor: color,
+          borderRadius: 3 * s,
+        })}
+      />
+    </View>
+  );
+}

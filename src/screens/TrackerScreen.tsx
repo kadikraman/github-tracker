@@ -1,87 +1,76 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SectionKey } from '../api/github';
-import { TrackerSection } from '../components/TrackerSection';
-import {
-  AtSignIcon,
-  EyeIcon,
-  IssueIcon,
-  MonitorIcon,
-  MoonIcon,
-  PullRequestIcon,
-  RefreshIcon,
-  SlidersIcon,
-  SunIcon,
-} from '../components/icons';
+import { Panel } from '../components/Panel';
+import { PullRequestIcon, RefreshIcon, SlidersIcon } from '../components/icons';
 import { OfflineBanner } from '../components/OfflineBanner';
+import { useAllSections } from '../hooks/useAllSections';
 import { useHidden } from '../hooks/useHidden';
 import { useTheme } from '../hooks/useTheme';
-import { useTrackedItems } from '../hooks/useTrackedItems';
-import { timeAgo } from '../lib/timeAgo';
-import { appBadgeColor, type Palette, type ThemeMode } from '../theme';
+import { useViewer } from '../hooks/useViewer';
+import { groupItems, type GroupKey } from '../lib/groups';
+import { alpha, appBadgeColor, type Palette } from '../theme';
 
-const SECTION_ICONS: Record<SectionKey, (accent: string) => ReactNode> = {
-  review: (accent) => <EyeIcon size={16} color={accent} />,
-  mentioned: (accent) => <AtSignIcon size={17} color={accent} />,
-  issues: (accent) => <IssueIcon size={17} color={accent} />,
-  authored: (accent) => <PullRequestIcon size={17} color={accent} />,
-};
+// Panels sit in as many columns as fit at this width, in rows laid out by hand:
+// Yoga's flexWrap misplaced panels after the filter changed how many there were.
+const PANEL_MIN_WIDTH = 520;
+const PANEL_GAP = 16;
 
-const SECTION_CONFIG: { key: SectionKey; title: string; accentKey: keyof Palette }[] = [
+const PANELS: { key: SectionKey; title: string; accentKey: keyof Palette; limit?: number }[] = [
   { key: 'review', title: 'Review requested', accentKey: 'review' },
   { key: 'authored', title: 'My open PRs', accentKey: 'prs' },
-  { key: 'mentioned', title: 'Mentioned', accentKey: 'mentioned' },
-  { key: 'issues', title: 'Issues on my repos', accentKey: 'issues' },
+  { key: 'reviewed', title: 'Reviewed by me, not merged', accentKey: 'reviewed' },
+  { key: 'mentioned', title: 'Mentioned', accentKey: 'mentioned', limit: 5 },
+  { key: 'issues', title: 'Issues on my repos', accentKey: 'issues', limit: 5 },
 ];
 
-type SummaryCardProps = {
-  title: string;
-  accent: string;
-  count: number | null;
-  hiddenCount: number;
-  onPress: () => void;
-};
+type Chip = { label: string; section: SectionKey; group?: GroupKey; accentKey: keyof Palette };
 
-function SummaryCard({ title, accent, count, hiddenCount, onPress }: SummaryCardProps) {
+// A chip filters the panels down to one group, or to one whole section.
+const CHIPS: Chip[] = [
+  { label: 'Needs your review', section: 'review', group: 'needs_review', accentKey: 'review' },
+  { label: 'Changes requested', section: 'review', group: 'changes_requested', accentKey: 'danger' },
+  { label: 'My PRs approved', section: 'authored', group: 'my_approved', accentKey: 'prs' },
+  { label: 'My drafts', section: 'authored', group: 'my_drafts', accentKey: 'faint' },
+  { label: 'Reviewed by me', section: 'reviewed', accentKey: 'reviewed' },
+  { label: 'Mentioned', section: 'mentioned', accentKey: 'mentioned' },
+  { label: 'Issues', section: 'issues', accentKey: 'issues' },
+];
+
+function chipId(chip: Chip): string {
+  return `${chip.section}:${chip.group ?? '*'}`;
+}
+
+function FilterChip({
+  chip,
+  count,
+  active,
+  onPress,
+}: {
+  chip: Chip;
+  count: number | null;
+  active: boolean;
+  onPress: () => void;
+}) {
   const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
+  const textColor = active ? colors.review : colors.text;
   return (
     <Pressable
       onPress={onPress}
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
       style={[
-        styles.summaryCard,
-        { backgroundColor: colors.card },
-        colors.shadow,
-        hovered && { transform: [{ translateY: -2 }] },
+        styles.chip,
+        { borderColor: colors.border, backgroundColor: colors.card },
+        hovered && { backgroundColor: colors.cardHover },
+        active && { borderColor: alpha(colors.review, 0.45), backgroundColor: alpha(colors.review, 0.1) },
       ]}
     >
-      <View style={styles.summaryTitleRow}>
-        <View style={[styles.summaryDot, { backgroundColor: accent }]} />
-        <Text style={[styles.summaryTitle, { color: colors.muted }]} numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
-      <View style={styles.summaryCountRow}>
-        <Text style={[styles.summaryCount, { color: accent }]}>{count ?? '–'}</Text>
-        {hiddenCount > 0 ? (
-          <View style={[styles.summaryHiddenPill, { backgroundColor: colors.sunken }]}>
-            <Text style={[styles.summaryHiddenPillText, { color: colors.faint }]}>
-              {hiddenCount} hidden
-            </Text>
-          </View>
-        ) : null}
-      </View>
+      <View style={[styles.chipDot, { backgroundColor: colors[chip.accentKey] as string }]} />
+      <Text style={[styles.chipLabel, { color: textColor }]}>{chip.label}</Text>
+      <Text style={[styles.chipCount, { color: textColor }]}>{count ?? '–'}</Text>
     </Pressable>
   );
 }
@@ -101,53 +90,52 @@ function ToolbarButton({ onPress, children }: { onPress: () => void; children: R
   );
 }
 
-function ThemeSegmentedControl() {
-  const { mode, setMode, colors } = useTheme();
-  const options: { value: ThemeMode; icon: (color: string) => ReactNode }[] = [
-    { value: 'light', icon: (color) => <SunIcon size={15} color={color} /> },
-    { value: 'dark', icon: (color) => <MoonIcon size={15} color={color} /> },
-    { value: 'system', icon: (color) => <MonitorIcon size={15} color={color} /> },
-  ];
-  return (
-    <View style={[styles.segContainer, { backgroundColor: colors.sunken }]}>
-      {options.map((option) => {
-        const active = mode === option.value;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => setMode(option.value)}
-            style={[styles.segButton, active && [{ backgroundColor: colors.card }, colors.shadow]]}
-          >
-            {option.icon(active ? colors.text : colors.faint)}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }) {
   const queryClient = useQueryClient();
   const { colors } = useTheme();
   const { hidden, hideItem, unhideItem } = useHidden();
-  const scrollRef = useRef<ScrollView>(null);
-  const sectionOffsets = useRef<Partial<Record<SectionKey, number>>>({});
+  const login = useViewer().data?.login;
+  const { queries, anyFetching, lastUpdatedAt, syncLabel } = useAllSections();
+  const [filter, setFilter] = useState<string | null>(null);
+  const [gridWidth, setGridWidth] = useState(0);
 
-  const review = useTrackedItems('review');
-  const mentioned = useTrackedItems('mentioned');
-  const issues = useTrackedItems('issues');
-  const authored = useTrackedItems('authored');
-  const queriesByKey = { review, mentioned, issues, authored } as const;
-  const queries = Object.values(queriesByKey);
+  const sections = PANELS.map((panel) => {
+    const query = queries[panel.key];
+    const hiddenIds = hidden[panel.key] ?? [];
+    const items = query.data ?? [];
+    const visible = items.filter((item) => !hiddenIds.includes(item.id));
+    return {
+      ...panel,
+      query,
+      groups: groupItems(panel.key, visible),
+      hiddenItems: items.filter((item) => hiddenIds.includes(item.id)),
+      loaded: query.data !== undefined,
+    };
+  });
 
-  const anyFetching = queries.some((q) => q.isFetching);
-  const lastUpdatedAt = Math.max(0, ...queries.map((q) => q.dataUpdatedAt));
+  const chipCount = (chip: Chip): number | null => {
+    const section = sections.find((s) => s.key === chip.section);
+    if (!section?.loaded) {
+      return null;
+    }
+    const groups = chip.group ? section.groups.filter((g) => g.key === chip.group) : section.groups;
+    return groups.reduce((sum, group) => sum + group.items.length, 0);
+  };
 
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(interval);
-  }, []);
+  const activeChip = CHIPS.find((chip) => chipId(chip) === filter);
+  const shownSections = sections
+    .filter((section) => !activeChip || section.key === activeChip.section)
+    .map((section) =>
+      activeChip?.group
+        ? { ...section, groups: section.groups.filter((g) => g.key === activeChip.group) }
+        : section
+    );
+
+  const columns = Math.max(1, Math.floor((gridWidth + PANEL_GAP) / (PANEL_MIN_WIDTH + PANEL_GAP)));
+  const rows: (typeof shownSections)[] = [];
+  for (let i = 0; i < shownSections.length; i += columns) {
+    rows.push(shownSections.slice(i, i + columns));
+  }
 
   const spin = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -168,12 +156,6 @@ export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }
   }, [anyFetching, spin]);
   const spinRotation = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
 
-  const syncLabel = anyFetching
-    ? 'Syncing…'
-    : lastUpdatedAt > 0
-      ? `Updated ${timeAgo(new Date(lastUpdatedAt).toISOString())}`
-      : 'Waiting for first sync';
-
   return (
     <View style={[styles.container, { backgroundColor: colors.appBg }]}>
       <View
@@ -184,10 +166,23 @@ export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }
         </View>
         <View>
           <Text style={[styles.appTitle, { color: colors.text }]}>GitHub Tracker</Text>
-          <Text style={[styles.syncLabel, { color: colors.faint }]}>{syncLabel}</Text>
+          <Text style={[styles.syncLabel, { color: colors.muted }]}>{syncLabel}</Text>
+        </View>
+        <View style={styles.chips}>
+          {CHIPS.map((chip) => {
+            const id = chipId(chip);
+            return (
+              <FilterChip
+                key={id}
+                chip={chip}
+                count={chipCount(chip)}
+                active={filter === id}
+                onPress={() => setFilter((prev) => (prev === id ? null : id))}
+              />
+            );
+          })}
         </View>
         <View style={styles.toolbarRight}>
-          <ThemeSegmentedControl />
           <ToolbarButton onPress={() => queryClient.invalidateQueries({ queryKey: ['items'] })}>
             <Animated.View style={anyFetching ? { transform: [{ rotate: spinRotation }] } : null}>
               <RefreshIcon size={16} color={colors.muted} />
@@ -201,50 +196,32 @@ export function TrackerScreen({ onOpenSettings }: { onOpenSettings: () => void }
 
       <OfflineBanner lastUpdatedAt={lastUpdatedAt > 0 ? lastUpdatedAt : undefined} />
 
-      <ScrollView ref={scrollRef} contentContainerStyle={styles.listContent}>
-        <View style={styles.summaryGrid}>
-          {SECTION_CONFIG.map(({ key, title, accentKey }) => {
-            const query = queriesByKey[key];
-            const hiddenIds = hidden[key] ?? [];
-            const items = query.data;
-            return (
-              <SummaryCard
-                key={key}
-                title={title}
-                accent={colors[accentKey] as string}
-                count={items ? items.filter((item) => !hiddenIds.includes(item.id)).length : null}
-                hiddenCount={items ? items.filter((item) => hiddenIds.includes(item.id)).length : 0}
-                onPress={() => {
-                  const y = sectionOffsets.current[key];
-                  if (y != null) {
-                    scrollRef.current?.scrollTo({ y: Math.max(0, y - 4), animated: true });
-                  }
-                }}
-              />
-            );
-          })}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View
+          style={styles.panelGrid}
+          onLayout={(event) => setGridWidth(event.nativeEvent.layout.width)}
+        >
+          {gridWidth > 0
+            ? rows.map((row) => (
+                <View key={row.map((section) => section.key).join('+')} style={styles.panelRow}>
+                  {row.map((section) => (
+                    <Panel
+                      key={section.key}
+                      title={section.title}
+                      accent={colors[section.accentKey] as string}
+                      query={section.query}
+                      groups={section.groups}
+                      hiddenItems={section.hiddenItems}
+                      limit={section.limit}
+                      login={login}
+                      onHide={(id) => hideItem(section.key, id)}
+                      onUnhide={(id) => unhideItem(section.key, id)}
+                    />
+                  ))}
+                </View>
+              ))
+            : null}
         </View>
-        {SECTION_CONFIG.map(({ key, title, accentKey }) => {
-          const accent = colors[accentKey] as string;
-          return (
-            <View
-              key={key}
-              onLayout={(event) => {
-                sectionOffsets.current[key] = event.nativeEvent.layout.y;
-              }}
-            >
-              <TrackerSection
-                title={title}
-                accent={accent}
-                icon={SECTION_ICONS[key](accent)}
-                query={queriesByKey[key]}
-                hiddenIds={hidden[key] ?? []}
-                onHide={(id) => hideItem(key, id)}
-                onUnhide={(id) => unhideItem(key, id)}
-              />
-            </View>
-          );
-        })}
       </ScrollView>
     </View>
   );
@@ -257,105 +234,83 @@ const styles = StyleSheet.create({
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 11,
-    paddingHorizontal: 15,
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
   },
   appBadge: {
-    width: 27,
-    height: 27,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
   appTitle: {
     fontSize: 14,
     fontWeight: '600',
-    letterSpacing: -0.14,
   },
   syncLabel: {
-    fontSize: 11,
-    marginTop: 2,
+    fontSize: 12,
+    marginTop: 1,
+  },
+  chips: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginLeft: 4,
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    height: 28,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  chipLabel: {
+    fontSize: 12,
+  },
+  chipCount: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   toolbarRight: {
-    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  segContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    padding: 2,
-    borderRadius: 9,
-  },
-  segButton: {
-    width: 30,
-    height: 26,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 4,
   },
   toolbarButton: {
-    width: 30,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  listContent: {
-    paddingTop: 6,
-    paddingBottom: 34,
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
   },
-  summaryGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 22,
+  panelGrid: {
+    width: '100%',
+    maxWidth: 1440,
+    alignSelf: 'center',
+    gap: PANEL_GAP,
     paddingTop: 16,
-    paddingBottom: 6,
+    paddingBottom: 24,
   },
-  summaryCard: {
-    flex: 1,
-    borderRadius: 14,
-    paddingTop: 13,
-    paddingHorizontal: 15,
-    paddingBottom: 14,
-    gap: 9,
-  },
-  summaryTitleRow: {
+  panelRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  summaryDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  summaryTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    flexShrink: 1,
-  },
-  summaryCountRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
-  },
-  summaryCount: {
-    fontSize: 27,
-    fontWeight: '700',
-    lineHeight: 28,
-  },
-  summaryHiddenPill: {
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  summaryHiddenPillText: {
-    fontSize: 11,
-    fontWeight: '600',
+    alignItems: 'flex-start',
+    gap: PANEL_GAP,
   },
 });

@@ -1,36 +1,78 @@
-import { useState } from 'react';
+import { setStringAsync } from '@legendapp/spark/clipboard';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ReviewState, TrackedItem } from '../api/types';
+import type { TrackedItem } from '../api/types';
 import { useTheme } from '../hooks/useTheme';
 import { reviewStateDisplay } from '../lib/reviewState';
-import { timeAgo } from '../lib/timeAgo';
+import { timeAgoShort } from '../lib/timeAgo';
 import { alpha } from '../theme';
-import { EyeIcon, EyeOffIcon, IssueIcon, PullRequestIcon } from './icons';
+import { CopyIcon, EyeIcon, EyeOffIcon, IssueIcon, PullRequestIcon } from './icons';
 
 export function repoFullName(repositoryUrl: string): string {
   const [, fullName] = repositoryUrl.split('/repos/');
   return fullName ?? repositoryUrl;
 }
 
-function ReviewTag({ state }: { state: ReviewState }) {
+/** The repository without its owner when the signed-in user is the owner. */
+export function repoShortName(repositoryUrl: string, login: string | undefined): string {
+  const full = repoFullName(repositoryUrl);
+  return login && full.startsWith(`${login}/`) ? full.slice(login.length + 1) : full;
+}
+
+function StateChip({ item }: { item: TrackedItem }) {
   const { colors } = useTheme();
-  const { label, color } = reviewStateDisplay(state, colors);
-  const background = state === 'review_required' ? colors.sunken : alpha(color, 0.14);
+  if (item.draft) {
+    return (
+      <View style={[styles.chip, { borderWidth: 1, borderColor: colors.border }]}>
+        <Text style={[styles.chipText, { color: colors.muted }]}>Draft</Text>
+      </View>
+    );
+  }
+  if (!item.review_state) {
+    return null;
+  }
+  const { label, color } = reviewStateDisplay(item.review_state, colors);
+  const background = item.review_state === 'review_required' ? colors.sunken : alpha(color, 0.14);
   return (
-    <View style={[styles.tag, { backgroundColor: background }]}>
-      <Text style={[styles.tagText, { color }]}>{label.toUpperCase()}</Text>
+    <View style={[styles.chip, { backgroundColor: background }]}>
+      <Text style={[styles.chipText, { color }]}>{label}</Text>
     </View>
+  );
+}
+
+function CopyLinkButton({ url, accent }: { url: string; accent: string }) {
+  const { colors } = useTheme();
+  const [hovered, setHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = () => {
+    setStringAsync(url).catch((error: unknown) => console.error('Copying the link failed', error));
+    setCopied(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1200);
+  };
+  const color = copied ? colors.success : hovered ? accent : colors.faint;
+  return (
+    <Pressable
+      onPress={copy}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      style={[styles.iconButton, hovered && { backgroundColor: alpha(accent, 0.13) }]}
+    >
+      <CopyIcon size={14} color={color} />
+    </Pressable>
   );
 }
 
 type ItemRowProps = {
   item: TrackedItem;
   accent: string;
-  isLast: boolean;
+  login: string | undefined;
   onHide: () => void;
 };
 
-export function ItemRow({ item, accent, isLast, onHide }: ItemRowProps) {
+export function ItemRow({ item, accent, login, onHide }: ItemRowProps) {
   const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
   const [hideHovered, setHideHovered] = useState(false);
@@ -43,40 +85,32 @@ export function ItemRow({ item, accent, isLast, onHide }: ItemRowProps) {
       onHoverOut={() => setHovered(false)}
       style={[
         styles.row,
-        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.sep },
+        { borderTopColor: colors.sep },
         hovered && { backgroundColor: colors.cardHover },
       ]}
     >
-      <View style={styles.typeIcon}>
-        {isIssue ? (
-          <IssueIcon size={17} color={accent} />
-        ) : (
-          <PullRequestIcon size={17} color={accent} />
-        )}
-      </View>
-      <View style={styles.body}>
-        <View style={styles.titleLine}>
-          <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-          {item.draft ? (
-            <View style={[styles.tag, { backgroundColor: colors.sunken }]}>
-              <Text style={[styles.tagText, { color: colors.muted }]}>DRAFT</Text>
-            </View>
-          ) : null}
-          {item.review_state ? <ReviewTag state={item.review_state} /> : null}
-        </View>
-        <Text style={[styles.meta, { color: colors.muted }]} numberOfLines={1}>
-          {repoFullName(item.repository_url)}{' '}
-          <Text style={{ color: colors.faint }}>#{item.number}</Text> · {item.user.login} ·
-          updated {timeAgo(item.updated_at)}
+      {isIssue ? <IssueIcon size={14} color={accent} /> : <PullRequestIcon size={14} color={accent} />}
+      <View style={styles.titleCell}>
+        <Text numberOfLines={1} style={[styles.title, { color: colors.text }]}>
+          {item.title}
+        </Text>
+        <Text numberOfLines={1} style={[styles.repo, { color: colors.muted }]}>
+          {repoShortName(item.repository_url, login)} #{item.number}
         </Text>
       </View>
+      <StateChip item={item} />
+      <Text numberOfLines={1} style={[styles.author, { color: colors.muted }]}>
+        {item.user.login}
+      </Text>
+      <Text style={[styles.age, { color: colors.muted }]}>{timeAgoShort(item.updated_at)}</Text>
+      <CopyLinkButton url={item.html_url} accent={accent} />
       <Pressable
         onPress={onHide}
         onHoverIn={() => setHideHovered(true)}
         onHoverOut={() => setHideHovered(false)}
-        style={[styles.hideButton, hideHovered && { backgroundColor: alpha(accent, 0.13) }]}
+        style={[styles.iconButton, hideHovered && { backgroundColor: alpha(accent, 0.13) }]}
       >
-        <EyeOffIcon size={16} color={hideHovered ? accent : colors.faint} />
+        <EyeOffIcon size={14} color={hideHovered ? accent : colors.faint} />
       </Pressable>
     </Pressable>
   );
@@ -85,36 +119,31 @@ export function ItemRow({ item, accent, isLast, onHide }: ItemRowProps) {
 type HiddenItemRowProps = {
   item: TrackedItem;
   accent: string;
-  isLast: boolean;
+  login: string | undefined;
   onUnhide: () => void;
 };
 
-export function HiddenItemRow({ item, accent, isLast, onUnhide }: HiddenItemRowProps) {
+export function HiddenItemRow({ item, accent, login, onUnhide }: HiddenItemRowProps) {
   const { colors } = useTheme();
   const [hovered, setHovered] = useState(false);
   return (
-    <View
-      style={[
-        styles.hiddenRow,
-        !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.sep },
-      ]}
-    >
-      <View style={[styles.body, styles.hiddenBody]}>
-        <Text style={[styles.hiddenTitle, { color: colors.text, textDecorationColor: colors.faint }]}>
+    <View style={[styles.row, { borderTopColor: colors.sep }]}>
+      <View style={[styles.titleCell, styles.hiddenCell]}>
+        <Text numberOfLines={1} style={[styles.title, styles.hiddenTitle, { color: colors.text }]}>
           {item.title}
         </Text>
-        <Text style={[styles.hiddenMeta, { color: colors.muted }]} numberOfLines={1}>
-          {repoFullName(item.repository_url)} #{item.number} · {item.user.login}
+        <Text numberOfLines={1} style={[styles.repo, { color: colors.muted }]}>
+          {repoShortName(item.repository_url, login)} #{item.number}
         </Text>
       </View>
       <Pressable
         onPress={onUnhide}
         onHoverIn={() => setHovered(true)}
         onHoverOut={() => setHovered(false)}
-        style={[styles.unhideButton, { backgroundColor: colors.card }, colors.shadow]}
+        style={[styles.unhideButton, hovered && { backgroundColor: alpha(accent, 0.13) }]}
       >
-        <EyeIcon size={14} color={hovered ? accent : colors.text} />
-        <Text style={[styles.unhideText, { color: hovered ? accent : colors.text }]}>Unhide</Text>
+        <EyeIcon size={13} color={hovered ? accent : colors.muted} />
+        <Text style={[styles.unhideText, { color: hovered ? accent : colors.muted }]}>Unhide</Text>
       </Pressable>
     </View>
   );
@@ -124,78 +153,69 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    gap: 8,
+    minHeight: 36,
+    paddingLeft: 14,
+    paddingRight: 6,
+    borderTopWidth: 1,
   },
-  typeIcon: {
-    flex: 0,
-  },
-  body: {
+  titleCell: {
     flex: 1,
     minWidth: 0,
-  },
-  titleLine: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'baseline',
     gap: 8,
-    flexWrap: 'wrap',
+  },
+  hiddenCell: {
+    opacity: 0.7,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 18,
     flexShrink: 1,
+    fontSize: 13,
+    fontWeight: '500',
   },
-  tag: {
-    borderRadius: 6,
+  hiddenTitle: {
+    textDecorationLine: 'line-through',
+  },
+  repo: {
+    flexShrink: 0,
+    fontSize: 12,
+  },
+  chip: {
+    flexShrink: 0,
+    borderRadius: 999,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  tagText: {
-    fontSize: 10.5,
+  chipText: {
+    fontSize: 11,
     fontWeight: '600',
-    letterSpacing: 0.42,
   },
-  meta: {
-    fontSize: 12.5,
-    marginTop: 3,
+  author: {
+    width: 104,
+    fontSize: 12,
   },
-  hideButton: {
-    flex: 0,
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+  age: {
+    width: 32,
+    fontSize: 12,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
+  iconButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hiddenRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-  },
-  hiddenBody: {
-    opacity: 0.72,
-  },
-  hiddenTitle: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    textDecorationLine: 'line-through',
-  },
-  hiddenMeta: {
-    fontSize: 12,
-    marginTop: 2,
-  },
   unhideButton: {
-    flex: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    gap: 5,
+    height: 26,
+    paddingHorizontal: 9,
+    marginRight: 4,
+    borderRadius: 6,
   },
   unhideText: {
     fontSize: 12,

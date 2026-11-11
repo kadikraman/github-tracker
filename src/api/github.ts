@@ -1,6 +1,7 @@
 import type {
   GitHubSearchResponse,
   GitHubViewer,
+  MyReview,
   PullRequestReviews,
   ReviewState,
   TrackedItem,
@@ -13,6 +14,7 @@ export const SECTION_QUERIES = {
   mentioned: 'is:open archived:false mentions:@me -author:@me',
   issues: 'is:open is:issue archived:false user:@me',
   authored: 'is:open is:pr archived:false author:@me',
+  reviewed: 'is:open is:pr archived:false reviewed-by:@me -author:@me',
 } as const;
 
 export type SectionKey = keyof typeof SECTION_QUERIES;
@@ -57,6 +59,7 @@ export async function searchItems(token: string, query: string): Promise<Tracked
     `q=${encodeURIComponent(query)}`,
     'per_page=50',
     'sort=updated',
+    'order=asc',
     'advanced_search=true',
   ].join('&');
   const data = await request<GitHubSearchResponse>(token, `/search/issues?${params}`);
@@ -69,6 +72,7 @@ const REVIEWS_QUERY = `query ($ids: [ID!]!) {
       id
       reviewDecision
       latestOpinionatedReviews(first: 50) { nodes { state } }
+      reviews(last: 50) { nodes { state viewerDidAuthor } }
     }
   }
 }`;
@@ -89,6 +93,21 @@ function reviewState(pr: PullRequestReviews): ReviewState | undefined {
   return undefined;
 }
 
+function myReview(pr: PullRequestReviews): MyReview | undefined {
+  const mine = pr.reviews.nodes.filter((review) => review.viewerDidAuthor && review.state !== 'PENDING');
+  const latest = mine[mine.length - 1];
+  switch (latest?.state) {
+    case 'APPROVED':
+      return 'approved';
+    case 'CHANGES_REQUESTED':
+      return 'changes_requested';
+    case undefined:
+      return undefined;
+    default:
+      return 'commented';
+  }
+}
+
 // Search results carry no review state, so it comes from one GraphQL lookup.
 // A failed lookup leaves the items without it rather than failing the section.
 async function withReviewStates(token: string, items: TrackedItem[]): Promise<TrackedItem[]> {
@@ -102,13 +121,13 @@ async function withReviewStates(token: string, items: TrackedItem[]): Promise<Tr
       '/graphql',
       { method: 'POST', body: JSON.stringify({ query: REVIEWS_QUERY, variables: { ids } }) }
     );
-    const states = new Map<string, ReviewState | undefined>();
+    const states = new Map<string, Pick<TrackedItem, 'review_state' | 'my_review'>>();
     for (const node of data?.nodes ?? []) {
       if (node?.id != null) {
-        states.set(node.id, reviewState(node));
+        states.set(node.id, { review_state: reviewState(node), my_review: myReview(node) });
       }
     }
-    return items.map((item) => ({ ...item, review_state: states.get(item.node_id) }));
+    return items.map((item) => ({ ...item, ...states.get(item.node_id) }));
   } catch {
     return items;
   }

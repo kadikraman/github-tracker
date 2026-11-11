@@ -13,8 +13,8 @@ import {
 
 export const POPOVER_COMPONENT = 'GitHubTrackerMenuBar';
 const POPOVER_ID = 'popover';
-const WIDTH = 340;
-const HEIGHT = 480;
+const WIDTH = 380;
+const HEIGHT = 790;
 // A tray click on an open popover blurs it first (which hides it), then
 // arrives as a click; without this window the click would reopen it.
 const REOPEN_GRACE_MS = 300;
@@ -40,13 +40,16 @@ async function popoverPosition() {
     Math.max(cursor.x - WIDTH / 2, workArea.x + 6),
     workArea.x + workArea.width - WIDTH - 6
   );
-  return { displayId: display.id, x, y: workArea.y + 4 };
+  return {
+    position: { displayId: display.id, x, y: workArea.y + 4 },
+    size: { width: WIDTH, height: Math.min(HEIGHT, workArea.height - 8) },
+  };
 }
 
 async function openPopover(): Promise<void> {
-  const position = await popoverPosition();
+  const { position, size } = await popoverPosition();
   if (await findPopover()) {
-    await setWindowBounds(POPOVER_ID, { ...position, width: WIDTH, height: HEIGHT });
+    await setWindowBounds(POPOVER_ID, { ...position, ...size });
   } else {
     // An overlay keeps showing while another app is active, and the hidden
     // (titled) title bar lets it become key, so it gets blur events.
@@ -54,7 +57,7 @@ async function openPopover(): Promise<void> {
       id: POPOVER_ID,
       component: POPOVER_COMPONENT,
       kind: 'overlay',
-      size: { width: WIDTH, height: HEIGHT },
+      size,
       position,
       titleBarStyle: 'hidden',
       // Without an appearance Spark makes the window dark, so the glass stayed
@@ -125,7 +128,7 @@ export function startMenuBar(): void {
   createTray({
     id: 'github-tracker',
     tooltip: 'GitHub Tracker',
-    macos: { symbol: 'arrow.triangle.pull' },
+    macos: { symbol: 'point.3.filled.connected.trianglepath.dotted' },
     onAction: (action) => {
       if (action.type === 'click') {
         togglePopover().catch(logError);

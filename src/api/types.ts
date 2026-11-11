@@ -1,4 +1,6 @@
 export type ReviewState = 'approved' | 'changes_requested' | 'review_required';
+/** The latest review the signed-in user left on a PR. */
+export type MyReview = 'approved' | 'changes_requested' | 'commented';
 
 export type TrackedItem = {
   id: number;
@@ -13,6 +15,8 @@ export type TrackedItem = {
   pull_request?: { merged_at: string | null };
   /** Not in the search response; added from GraphQL in `searchItems`. */
   review_state?: ReviewState;
+  /** Not in the search response; added from GraphQL in `searchItems`. */
+  my_review?: MyReview;
 };
 
 export type GitHubSearchResponse = {
@@ -28,4 +32,5 @@ export type PullRequestReviews = {
   id: string;
   reviewDecision: 'APPROVED' | 'CHANGES_REQUESTED' | 'REVIEW_REQUIRED' | null;
   latestOpinionatedReviews: { nodes: { state: string }[] };
+  reviews: { nodes: { state: string; viewerDidAuthor: boolean }[] };
 };
