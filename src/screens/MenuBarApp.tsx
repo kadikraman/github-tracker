@@ -1,6 +1,6 @@
 import { GlassView, getGlassAvailability } from '@legendapp/spark/ui/glass';
 import { QueryClientProvider, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { SectionKey } from '../api/github';
 import type { TrackedItem } from '../api/types';
@@ -11,12 +11,14 @@ import { HiddenProvider, useHidden } from '../hooks/useHidden';
 import { ThemeProvider, useTheme } from '../hooks/useTheme';
 import { TokenProvider, useToken } from '../hooks/useToken';
 import { byOldest, groupItems, type Group, type GroupKey } from '../lib/groups';
-import { closePopover, openMainWindow } from '../lib/menuBar';
+import { closePopover, fitPopoverHeight, openMainWindow } from '../lib/menuBar';
 import { queryClient } from '../lib/queryClient';
 import { timeAgoShort } from '../lib/timeAgo';
 import { alpha, type Palette } from '../theme';
 
 const hasGlass = getGlassAvailability().available;
+const FOOTER_HEIGHT = 44;
+const NO_TOKEN_HEIGHT = 160;
 
 const TILES: { key: SectionKey; label: string; accentKey: keyof Palette }[] = [
   { key: 'review', label: 'To review', accentKey: 'review' },
@@ -227,6 +229,16 @@ function TrackerPopover() {
   const { hidden } = useHidden();
   const queryClient = useQueryClient();
   const { queries, syncLabel } = useAllSections();
+  const [topHeight, setTopHeight] = useState(0);
+  const [listHeight, setListHeight] = useState(0);
+
+  // Measured from content alone, never from the window, so a resize cannot
+  // feed back into the next one.
+  useEffect(() => {
+    if (topHeight > 0 && listHeight > 0) {
+      fitPopoverHeight(topHeight + listHeight + FOOTER_HEIGHT);
+    }
+  }, [topHeight, listHeight]);
 
   const visibleItems = (key: SectionKey): TrackedItem[] | undefined => {
     const hiddenIds = hidden[key] ?? [];
@@ -235,26 +247,31 @@ function TrackerPopover() {
 
   return (
     <>
-      <View style={styles.header}>
-        <Text style={[styles.appTitle, { color: colors.text }]}>GitHub Tracker</Text>
-        <Text style={[styles.syncLabel, { color: colors.muted }]}>{syncLabel}</Text>
-        <View style={styles.spacer} />
-        <IconButton onPress={() => queryClient.invalidateQueries({ queryKey: ['items'] })}>
-          <RefreshIcon size={14} color={colors.muted} />
-        </IconButton>
+      <View onLayout={(event) => setTopHeight(event.nativeEvent.layout.height)}>
+        <View style={styles.header}>
+          <Text style={[styles.appTitle, { color: colors.text }]}>GitHub Tracker</Text>
+          <Text style={[styles.syncLabel, { color: colors.muted }]}>{syncLabel}</Text>
+          <View style={styles.spacer} />
+          <IconButton onPress={() => queryClient.invalidateQueries({ queryKey: ['items'] })}>
+            <RefreshIcon size={14} color={colors.muted} />
+          </IconButton>
+        </View>
+        <OfflineBanner />
+        <View style={styles.tiles}>
+          {TILES.map((tile) => (
+            <CountTile
+              key={tile.key}
+              label={tile.label}
+              accent={colors[tile.accentKey] as string}
+              count={visibleItems(tile.key)?.length ?? null}
+            />
+          ))}
+        </View>
       </View>
-      <OfflineBanner />
-      <View style={styles.tiles}>
-        {TILES.map((tile) => (
-          <CountTile
-            key={tile.key}
-            label={tile.label}
-            accent={colors[tile.accentKey] as string}
-            count={visibleItems(tile.key)?.length ?? null}
-          />
-        ))}
-      </View>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        onContentSizeChange={(_width, height) => setListHeight(height)}
+      >
         {SECTIONS.map((section) => {
           const groups = groupItems(section.key, visibleItems(section.key) ?? []);
           const openItems = groups
@@ -290,6 +307,12 @@ function TrackerPopover() {
 function PopoverContent() {
   const { colors } = useTheme();
   const { token, loaded } = useToken();
+
+  useEffect(() => {
+    if (loaded && !token) {
+      fitPopoverHeight(NO_TOKEN_HEIGHT);
+    }
+  }, [loaded, token]);
 
   // The popover window is transparent: glass draws its background on macOS 26+,
   // and older systems get the opaque window colour.
@@ -466,7 +489,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   footer: {
-    height: 44,
+    height: FOOTER_HEIGHT,
     borderTopWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

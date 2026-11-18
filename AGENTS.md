@@ -73,7 +73,7 @@ Small synchronous JSON files via the expo-file-system `File` API, read once at m
 
 - Theme via `useTheme()` + `Palette` in `src/theme.ts`; `alpha(hex, opacity)` for tints. No SVG dependency; icons are hand-built Views in `src/components/icons.tsx`.
 - Main window: a toolbar with filter chips (one chip filters the panels to one group or section, click again to clear), then panels that wrap into columns at 520pt (`Panel` + `ItemRow`, one line per item). Mentioned and Issues show five rows and a "Show all" link. The theme control lives on the Settings screen.
-- Popover: a header with the sync label, four count tiles that open the main window, then sections built from the same groups: open rows, and a folded toggle per secondary group (compact components inside `MenuBarApp.tsx`). It is 380 by 790pt, clamped to the work area.
+- Popover: a header with the sync label, four count tiles that open the main window, then sections built from the same groups: open rows, and a folded toggle per secondary group (compact components inside `MenuBarApp.tsx`). It is 380pt wide and fits its content height, up to 790pt and the work area: `TrackerPopover` measures the top block, the scroll content and the footer, never the window, and calls `fitPopoverHeight`.
 - Main window and popover do not share row/section components. Shared layers are hooks (`useAllSections` for every query and the sync label), api, storage, lib, and theme.
 
 <!-- spark:skill:start -->

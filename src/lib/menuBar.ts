@@ -14,13 +14,19 @@ import {
 export const POPOVER_COMPONENT = 'GitHubTrackerMenuBar';
 const POPOVER_ID = 'popover';
 const WIDTH = 380;
-const HEIGHT = 790;
+const MAX_HEIGHT = 790;
 // A tray click on an open popover blurs it first (which hides it), then
 // arrives as a click; without this window the click would reopen it.
 const REOPEN_GRACE_MS = 300;
 
 let listening = false;
 let hiddenByBlurAt = 0;
+// Until the popover reports its content, it opens at the most it can grow to.
+let contentHeight = MAX_HEIGHT;
+
+function popoverHeight(workArea: { height: number }): number {
+  return Math.min(contentHeight, MAX_HEIGHT, workArea.height - 8);
+}
 
 // The native window outlives a JS reload, so ask Spark rather than keep a flag.
 async function findPopover() {
@@ -42,7 +48,7 @@ async function popoverPosition() {
   );
   return {
     position: { displayId: display.id, x, y: workArea.y + 4 },
-    size: { width: WIDTH, height: Math.min(HEIGHT, workArea.height - 8) },
+    size: { width: WIDTH, height: popoverHeight(workArea) },
   };
 }
 
@@ -101,6 +107,33 @@ async function togglePopover(): Promise<void> {
     return;
   }
   await openPopover();
+}
+
+async function resizePopover(): Promise<void> {
+  const popover = await findPopover();
+  if (!popover) {
+    return;
+  }
+  const { bounds } = popover;
+  const display = (await getDisplays()).find((d) => d.id === bounds.displayId);
+  if (!display) {
+    return;
+  }
+  const height = popoverHeight(display.workArea);
+  if (height !== bounds.height) {
+    // Bounds count from the display's top, so the popover stays under the icon.
+    await setWindowBounds(POPOVER_ID, { ...bounds, height });
+  }
+}
+
+/** Fits the popover to its content, up to MAX_HEIGHT. */
+export function fitPopoverHeight(height: number): void {
+  const rounded = Math.ceil(height);
+  if (rounded === contentHeight) {
+    return;
+  }
+  contentHeight = rounded;
+  resizePopover().catch(logError);
 }
 
 export function closePopover(): void {
