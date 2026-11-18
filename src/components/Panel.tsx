@@ -1,5 +1,6 @@
+import { setStringAsync } from '@legendapp/spark/clipboard';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { GitHubApiError } from '../api/github';
 import type { TrackedItem } from '../api/types';
@@ -20,12 +21,52 @@ type Props = {
   onUnhide: (id: number) => void;
 };
 
-function GroupHeader({ label, count }: { label: string; count: number }) {
+/** Copies the links one per line, to hand a group to an agent. */
+function CopyAllButton({ urls }: { urls: string[] }) {
+  const { colors } = useTheme();
+  const [hovered, setHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = () => {
+    setStringAsync(urls.join('\n')).catch((error: unknown) =>
+      console.error('Copying the links failed', error)
+    );
+    setCopied(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopied(false), 1200);
+  };
+  return (
+    <Pressable
+      onPress={copy}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      style={[styles.copyAll, hovered && { backgroundColor: colors.card }]}
+    >
+      <Text
+        style={[
+          styles.groupLabel,
+          { color: copied ? colors.success : hovered ? colors.text : colors.muted },
+        ]}
+      >
+        {copied ? 'Copied' : 'Copy all'}
+      </Text>
+    </Pressable>
+  );
+}
+
+function GroupHeader({ label, count, urls }: { label: string; count: number; urls?: string[] }) {
   const { colors } = useTheme();
   return (
     <View style={[styles.groupHeader, { backgroundColor: colors.sunken, borderTopColor: colors.sep }]}>
       <Text style={[styles.groupLabel, { color: colors.muted }]}>{label}</Text>
       <Text style={[styles.groupLabel, { color: colors.muted }]}>{count}</Text>
+      {urls ? (
+        <>
+          <View style={styles.spacer} />
+          <CopyAllButton urls={urls} />
+        </>
+      ) : null}
     </View>
   );
 }
@@ -56,7 +97,8 @@ export function Panel({ title, accent, query, groups, hiddenItems, limit, login,
   const shown = groups.map((group) => {
     const items = group.items.slice(0, Math.max(0, budget));
     budget -= items.length;
-    return { ...group, items };
+    // Copy all takes the whole group, rows past "Show all" included.
+    return { ...group, items, urls: group.items.map((item) => item.html_url) };
   });
 
   return (
@@ -98,7 +140,7 @@ export function Panel({ title, accent, query, groups, hiddenItems, limit, login,
         shown.map((group) =>
           group.items.length === 0 ? null : (
             <View key={group.key}>
-              <GroupHeader label={group.label} count={group.items.length} />
+              <GroupHeader label={group.label} count={group.items.length} urls={group.urls} />
               {group.items.map((item) => (
                 <ItemRow
                   key={item.id}
@@ -193,6 +235,13 @@ const styles = StyleSheet.create({
     paddingBottom: 5,
     paddingHorizontal: 14,
     borderTopWidth: 1,
+  },
+  copyAll: {
+    marginVertical: -3,
+    marginRight: -6,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+    borderRadius: 5,
   },
   groupLabel: {
     fontSize: 11,
